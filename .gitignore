@@ -1,0 +1,36 @@
+# ─── Secrets & credentials ───
+*.key
+*.secret
+.env
+.env.*
+.env.local
+.env.production
+
+# ─── Backups with real keys ───
+*.bak
+*.bak.*
+*backup*
+
+# ─── OpenClaw user data ───
+sessions/
+auth-profiles.json
+gateway-startup.log
+
+# ─── OS files ───
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Debug logs ───
+*.log
+izzi-debug.log
+
+# ─── Node (if any) ───
+node_modules/
