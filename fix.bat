@@ -1,6 +1,8 @@
 @echo off
-:: Izzi x OpenClaw — Auto-Fix Tool (CMD wrapper)
+:: Izzi x OpenClaw - Auto-Fix Tool (CMD wrapper)
 :: Usage: fix.bat [--diagnose] [--auto]
+
+chcp 65001 >nul 2>&1
 
 set "ARGS="
 if /i "%~1"=="--diagnose" set "ARGS=-Diagnose"

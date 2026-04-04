@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Izzi × OpenClaw Connector — Windows Installer
+    Izzi x OpenClaw Connector - Windows Installer
 .DESCRIPTION
     Connects your Izzi API key to OpenClaw so all agents can use Izzi models.
     Applies known compatibility fixes automatically.
@@ -12,8 +12,6 @@
     Remove Izzi provider from OpenClaw config.
 .EXAMPLE
     .\install.ps1 -ApiKey "izzi-abc123..."
-.EXAMPLE
-    irm "https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install.ps1" | iex
 .LINK
     https://github.com/kentzu213/izzi-openclaw
 .NOTES
@@ -33,13 +31,13 @@ $Version = "1.0.0"
 $OC_DIR = Join-Path $env:USERPROFILE ".openclaw"
 $OC_CONFIG = Join-Path $OC_DIR "openclaw.json"
 
-# ─── Helpers ───
+# --- Helpers ---
 
 function Write-Banner {
     Write-Host ""
-    Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "  ║     🦞 Izzi × OpenClaw Connector v$Version  ║" -ForegroundColor Cyan
-    Write-Host "  ╚══════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "  ============================================" -ForegroundColor Cyan
+    Write-Host "       Izzi x OpenClaw Connector v$Version" -ForegroundColor Cyan
+    Write-Host "  ============================================" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -50,17 +48,17 @@ function Write-Step {
 
 function Write-Ok {
     param([string]$Msg)
-    Write-Host "    ✓ $Msg" -ForegroundColor Green
+    Write-Host "    [OK] $Msg" -ForegroundColor Green
 }
 
 function Write-Warn {
     param([string]$Msg)
-    Write-Host "    ⚠ $Msg" -ForegroundColor Yellow
+    Write-Host "    [WARN] $Msg" -ForegroundColor Yellow
 }
 
 function Write-Err {
     param([string]$Msg)
-    Write-Host "    ✗ $Msg" -ForegroundColor Red
+    Write-Host "    [FAIL] $Msg" -ForegroundColor Red
 }
 
 function Backup-File {
@@ -71,12 +69,12 @@ function Backup-File {
     }
 }
 
-# ─── Pre-flight checks ───
+# --- Pre-flight checks ---
 
 Write-Banner
 
 if (-not (Test-Path $OC_DIR)) {
-    Write-Host "  ❌ OpenClaw not found at $OC_DIR" -ForegroundColor Red
+    Write-Host "  [FAIL] OpenClaw not found at $OC_DIR" -ForegroundColor Red
     Write-Host ""
     Write-Host "  Install OpenClaw first:" -ForegroundColor Yellow
     Write-Host "    npm install -g openclaw" -ForegroundColor Gray
@@ -87,15 +85,15 @@ if (-not (Test-Path $OC_DIR)) {
     exit 1
 }
 
-Write-Host "  Status: 🟢 OpenClaw found at $OC_DIR" -ForegroundColor Green
+Write-Host "  [OK] OpenClaw found at $OC_DIR" -ForegroundColor Green
 Write-Host ""
 
-# ─── Uninstall mode ───
+# --- Uninstall mode ---
 
 if ($Uninstall) {
-    Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor Yellow
-    Write-Host "  ║       🗑️  Izzi Provider Uninstaller      ║" -ForegroundColor Yellow
-    Write-Host "  ╚══════════════════════════════════════════╝" -ForegroundColor Yellow
+    Write-Host "  ============================================" -ForegroundColor Yellow
+    Write-Host "       Izzi Provider Uninstaller" -ForegroundColor Yellow
+    Write-Host "  ============================================" -ForegroundColor Yellow
     Write-Host ""
 
     $step = 1
@@ -110,7 +108,8 @@ if ($Uninstall) {
             $config.models.providers.PSObject.Properties.Remove("izzi")
             $config | ConvertTo-Json -Depth 20 | Set-Content $OC_CONFIG -Encoding utf8
             Write-Ok "Removed izzi provider from openclaw.json"
-        } else {
+        }
+        else {
             Write-Ok "No izzi provider found (already clean)"
         }
     }
@@ -135,16 +134,19 @@ if ($Uninstall) {
 
     # Step 3: Restart gateway
     Write-Step $step $total "Restarting gateway..."
-    try { openclaw gateway restart 2>$null } catch {}
+    try {
+        openclaw gateway restart 2>$null
+    }
+    catch { }
     Write-Ok "Gateway restart triggered"
 
     Write-Host ""
-    Write-Host "  ✅ Izzi provider removed from OpenClaw!" -ForegroundColor Green
+    Write-Host "  [DONE] Izzi provider removed from OpenClaw!" -ForegroundColor Green
     Write-Host ""
     exit 0
 }
 
-# ─── Install mode ───
+# --- Install mode ---
 
 # Get API key
 if (-not $ApiKey) {
@@ -161,7 +163,7 @@ if (-not $ApiKey) {
 # Validate key format
 if (-not $ApiKey.StartsWith("izzi-")) {
     if (-not $Force) {
-        Write-Warn "API key doesn't start with 'izzi-'. Use -Force to override."
+        Write-Warn "API key does not start with 'izzi-'. Use -Force to override."
         exit 1
     }
 }
@@ -173,13 +175,13 @@ Write-Host ""
 $step = 1
 $total = 5
 
-# ─── Provider definition (template) ───
+# --- Provider definition (template) ---
 
 $providerConfig = @{
     baseUrl = $BaseUrl
-    api = "openai-completions"
-    apiKey = $ApiKey
-    models = @(
+    api     = "openai-completions"
+    apiKey  = $ApiKey
+    models  = @(
         @{ id = "auto"; name = "Smart Router (Auto)" }
         @{ id = "llama-3.3-70b"; name = "Llama 3.3 70B" }
         @{ id = "qwen3-235b"; name = "Qwen3 235B" }
@@ -200,7 +202,7 @@ $agentModelDef = @(
     @{ id = "gpt-5.4"; name = "GPT-5.4"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
 )
 
-# ─── Step 1: Update openclaw.json ───
+# --- Step 1: Update openclaw.json ---
 
 Write-Step $step $total "Updating openclaw.json..."
 
@@ -220,7 +222,8 @@ if (Test-Path $OC_CONFIG) {
     if ($config.models.providers.PSObject.Properties["izzi"]) {
         $config.models.providers.izzi = [PSCustomObject]$providerConfig
         Write-Ok "Updated existing izzi provider"
-    } else {
+    }
+    else {
         $config.models.providers | Add-Member -NotePropertyName "izzi" -NotePropertyValue ([PSCustomObject]$providerConfig)
         Write-Ok "Added izzi provider"
     }
@@ -232,13 +235,14 @@ if (Test-Path $OC_CONFIG) {
     }
 
     $config | ConvertTo-Json -Depth 20 | Set-Content $OC_CONFIG -Encoding utf8
-} else {
-    Write-Warn "openclaw.json not found — run 'openclaw setup' first"
+}
+else {
+    Write-Warn "openclaw.json not found - run 'openclaw setup' first"
 }
 
 $step++
 
-# ─── Step 2: Update ALL agent models.json ───
+# --- Step 2: Update ALL agent models.json ---
 
 Write-Step $step $total "Updating agent configs..."
 
@@ -254,14 +258,15 @@ foreach ($agent in $agentDirs) {
         # Add/update izzi provider with full model definitions
         $izziAgent = [PSCustomObject]@{
             baseUrl = $BaseUrl
-            apiKey = $ApiKey
-            api = "openai-completions"
-            models = $agentModelDef
+            apiKey  = $ApiKey
+            api     = "openai-completions"
+            models  = $agentModelDef
         }
 
         if ($models.providers.PSObject.Properties["izzi"]) {
             $models.providers.izzi = $izziAgent
-        } else {
+        }
+        else {
             $models.providers | Add-Member -NotePropertyName "izzi" -NotePropertyValue $izziAgent
         }
 
@@ -277,7 +282,7 @@ if ($updated -eq 0) {
 
 $step++
 
-# ─── Step 3: Apply known fixes ───
+# --- Step 3: Apply known fixes ---
 
 Write-Step $step $total "Applying compatibility fixes..."
 
@@ -304,7 +309,7 @@ if ($fixes -eq 0) {
 
 $step++
 
-# ─── Step 4: Connectivity test ───
+# --- Step 4: Connectivity test ---
 
 Write-Step $step $total "Testing connectivity..."
 
@@ -314,14 +319,15 @@ try {
     $response = Invoke-RestMethod -Uri $testUrl -Headers $headers -TimeoutSec 10 -ErrorAction Stop
     $modelCount = if ($response.data) { $response.data.Count } else { "?" }
     Write-Ok "Connected to Izzi API ($modelCount models available)"
-} catch {
-    Write-Warn "Could not reach $BaseUrl — this is OK if using localhost"
+}
+catch {
+    Write-Warn "Could not reach $BaseUrl - this is OK if using localhost"
     Write-Host "    You can test later with: openclaw models list" -ForegroundColor Gray
 }
 
 $step++
 
-# ─── Step 5: Restart gateway ───
+# --- Step 5: Restart gateway ---
 
 Write-Step $step $total "Restarting OpenClaw gateway..."
 
@@ -329,26 +335,28 @@ if (-not $SkipRestart) {
     try {
         $null = & openclaw gateway restart 2>&1
         Write-Ok "Gateway restart triggered"
-    } catch {
-        Write-Warn "Could not restart gateway — restart OpenClaw manually"
     }
-} else {
+    catch {
+        Write-Warn "Could not restart gateway - restart OpenClaw manually"
+    }
+}
+else {
     Write-Ok "Skipped (use -SkipRestart to disable)"
 }
 
-# ─── Done ───
+# --- Done ---
 
 Write-Host ""
-Write-Host "  ════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  ✅ Installation complete!" -ForegroundColor Green
+Write-Host "  ============================================" -ForegroundColor Cyan
+Write-Host "  [DONE] Installation complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor White
 Write-Host ""
 Write-Host "  1. Restart OpenClaw (close and reopen)" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  2. Select model 'auto · izzi' in chat" -ForegroundColor Gray
+Write-Host "  2. Select model 'auto - izzi' in chat" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  3. Send a message — it should work!" -ForegroundColor Gray
+Write-Host "  3. Send a message - it should work!" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  Dashboard: $BaseUrl/dashboard" -ForegroundColor DarkGray
 Write-Host "  Docs:      $BaseUrl/docs" -ForegroundColor DarkGray
