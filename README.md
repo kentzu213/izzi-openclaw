@@ -16,11 +16,18 @@
 
 ### 2. Run the installer
 
+**Windows (CMD / Terminal)**
+```cmd
+git clone https://github.com/kentzu213/izzi-openclaw.git
+cd izzi-openclaw
+install.bat izzi-YOUR_KEY_HERE
+```
+
 **Windows (PowerShell)**
 ```powershell
 git clone https://github.com/kentzu213/izzi-openclaw.git
 cd izzi-openclaw
-.\install.ps1 -ApiKey "izzi-YOUR_KEY_HERE"
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -ApiKey "izzi-YOUR_KEY_HERE"
 ```
 
 **macOS / Linux**
@@ -71,10 +78,16 @@ The installer automatically:
 
 Having issues? Run the auto-fix tool:
 
-**Windows**
+**Windows (CMD)**
+```cmd
+fix.bat --diagnose     &:: Report issues only
+fix.bat --auto         &:: Fix everything automatically
+```
+
+**Windows (PowerShell)**
 ```powershell
-.\fix.ps1 -Diagnose    # Report issues only
-.\fix.ps1 -Auto        # Fix everything automatically
+powershell -ExecutionPolicy Bypass -File .\fix.ps1 -Diagnose
+powershell -ExecutionPolicy Bypass -File .\fix.ps1 -Auto
 ```
 
 **macOS / Linux**
@@ -97,9 +110,14 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to:
 
 ## 🗑️ Uninstall
 
-**Windows**
+**Windows (CMD)**
+```cmd
+install.bat --uninstall
+```
+
+**Windows (PowerShell)**
 ```powershell
-.\install.ps1 -Uninstall
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
 ```
 
 **macOS / Linux**
@@ -113,10 +131,12 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to:
 
 ```
 izzi-openclaw/
-├── install.ps1          # Windows installer
+├── install.bat          # ⭐ Windows CMD installer (recommended)
+├── install.ps1          # Windows PowerShell installer
 ├── install.sh           # macOS/Linux installer
-├── fix.ps1              # Auto-fix tool (Windows)
-├── fix.sh               # Auto-fix tool (macOS/Linux)
+├── fix.bat              # ⭐ Windows CMD auto-fix tool
+├── fix.ps1              # Windows PowerShell auto-fix tool
+├── fix.sh               # macOS/Linux auto-fix tool
 ├── templates/
 │   ├── openclaw-provider.json    # Provider config template
 │   └── models.json               # Agent model definitions
