@@ -7,7 +7,7 @@
 set -e
 
 VERSION="1.0.0"
-BASE_URL="https://izziapi.com"
+BASE_URL="https://api.izziapi.com"
 API_KEY=""
 ACTION="install"
 SKIP_RESTART=false

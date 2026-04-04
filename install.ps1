@@ -20,7 +20,7 @@
 
 param(
     [string]$ApiKey = "",
-    [string]$BaseUrl = "https://izziapi.com",
+    [string]$BaseUrl = "https://api.izziapi.com",
     [switch]$Uninstall,
     [switch]$SkipRestart,
     [switch]$Force
