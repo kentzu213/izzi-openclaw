@@ -306,6 +306,9 @@ tail -50 /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
 | 2026-04-06 | ERR_TOO_MANY_REDIRECTS | Cloudflare/Caddy TLS conflict | ✅ Fixed |
 | 2026-04-06 | Provider 503 | Missing upstream API keys | ✅ Fixed |
 | 2026-04-07 | Model not found 400 | `qwen3-235b` doesn't exist | ✅ Fixed |
+| 2026-04-07 | CORS duplicate headers | Caddy + Hono both set `Access-Control-Allow-Origin` | ✅ Fixed (server) |
+| 2026-04-07 | Google login 401 "Invalid API key" | Proxy middleware intercepting JWT auth routes | ✅ Fixed (server) |
+| 2026-04-07 | HTTP 404 "Endpoint not found" | Root-level proxy paths missing after auth fix | ✅ Fixed (server) |
 
 ---
 

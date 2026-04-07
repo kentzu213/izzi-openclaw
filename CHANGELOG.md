@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] — 2026-04-07
+
+### Fixed (Server-Side — No reinstall needed)
+- **CRITICAL: Google login returns 401 "Invalid API key"** — Proxy middleware was intercepting dashboard JWT auth routes (`/api/auth/me`). Fixed by adding path guard in `authMiddleware` to skip `/api/*` paths.
+- **CORS duplicate headers blocking all API calls** — Both Caddy and Hono set `Access-Control-Allow-Origin`, browsers rejected the duplicate. Removed CORS from Caddy, letting Hono handle exclusively.
+- **HTTP 404 "Endpoint not found" for root-level paths** — `/chat/completions` (without `/v1/`) returned 404. Fixed by restoring root-level proxy route with auth guard.
+
+### Added
+- **3 new bug entries** in TROUBLESHOOTING.md (Issues #10-12)
+
+### Note
+> These fixes are **server-side only**. Users do NOT need to reinstall or update their OpenClaw config. The backend now correctly handles both `/v1/chat/completions` and `/chat/completions` paths.
+
 ## [1.1.0] — 2026-04-07
 
 ### Fixed
