@@ -1,7 +1,7 @@
 # 🦞 Izzi × OpenClaw Connector
 
 > Connect [Izzi API](https://izziapi.com) to [OpenClaw](https://tryopenclaw.io) in under 1 minute.  
-> Access GPT-5.4, Claude Sonnet 4, Llama 3.3, Qwen3 235B, and more — through a single API key.
+> Access GPT-5.4, Claude Sonnet 4, Llama 3.3, Qwen 3.6 Plus, and more — through a single API key.
 
 [![License: BSL-1.1](https://img.shields.io/badge/license-BSL--1.1-blue.svg)](LICENSE)
 [![OpenClaw Compatible](https://img.shields.io/badge/OpenClaw-compatible-brightgreen.svg)](https://tryopenclaw.io)
@@ -54,23 +54,33 @@ The installer automatically:
 | 2 | Backs up existing configuration |
 | 3 | Adds Izzi as an AI provider (global + per-agent) |
 | 4 | Sets Smart Router as default model |
-| 5 | Applies all known compatibility fixes |
-| 6 | Tests API connectivity |
-| 7 | Restarts the OpenClaw gateway |
+| 5 | Configures `baseUrl` to `https://api.izziapi.com` |
+| 6 | Applies all known compatibility fixes |
+| 7 | Tests API connectivity |
+| 8 | Restarts the OpenClaw gateway |
 
 ---
 
 ## 🤖 Available Models
 
+### Free Models (no credit cost)
+
+| Model | Type | Speed | Best For |
+|-------|------|-------|----------|
+| `auto` | Smart Router — auto-selects best model | ⚡⚡⚡ | General use |
+| `qwen3.6-plus-free` | Alibaba Qwen 3.6 Plus (with reasoning) | ⚡⚡ | Complex tasks |
+| `llama-3.3-70b` | Meta Llama 3.3 70B | ⚡⚡⚡ | Balanced |
+| `deepseek-r1-free` | DeepSeek R1 (reasoning) | ⚡⚡ | Step-by-step thinking |
+| `llama-3.1-8b` | Meta Llama 3.1 8B (ultrafast) | ⚡⚡⚡⚡ | Quick responses |
+
+### Premium Models (requires credits)
+
 | Model | Type | Speed |
 |-------|------|-------|
-| `auto` | Smart Router — auto-selects best model | ⚡⚡⚡ |
-| `llama-3.3-70b` | Meta Llama 3.3 70B | ⚡⚡⚡ |
-| `qwen3-235b` | Alibaba Qwen3 235B | ⚡⚡ |
-| `deepseek-r1-free` | DeepSeek R1 (reasoning) | ⚡⚡ |
-| `llama-3.1-8b` | Meta Llama 3.1 8B (fast) | ⚡⚡⚡⚡ |
 | `claude-sonnet-4` | Anthropic Claude Sonnet 4 | ⚡⚡ |
 | `gpt-5.4` | OpenAI GPT-5.4 | ⚡⚡ |
+
+> **Tip:** Use specific model IDs (e.g., `izzi/qwen3.6-plus-free`) instead of `izzi/auto` to see exactly which model is responding. The backend will auto-fallback to another provider if the selected one fails.
 
 ---
 
@@ -100,11 +110,24 @@ powershell -ExecutionPolicy Bypass -File .\fix.ps1 -Auto
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to:
 
-- ❌ `404 Upstream` errors
-- ❌ Double `/v1/v1` URL prefix
+- ❌ `LLM request failed: network connection error` — baseUrl pointing to localhost
+- ❌ `404 Upstream` — double `/v1/v1` URL prefix
+- ❌ `ERR_TOO_MANY_REDIRECTS` — Cloudflare/Caddy TLS conflict
+- ❌ `Model not found` — outdated model IDs (e.g., `qwen3-235b`)
 - ❌ Agent config overriding global config
-- ❌ Stale model names on OpenRouter
 - ❌ Gateway not picking up config changes
+- ❌ Provider 503 — missing upstream API keys
+
+### Quick Health Check
+
+```bash
+# Test if API is online
+curl -s https://api.izziapi.com/health
+# Expected: {"status":"ok","timestamp":"..."}
+
+# Test with your API key
+curl -s https://api.izziapi.com/v1/models -H "x-api-key: izzi-YOUR_KEY"
+```
 
 ---
 
@@ -141,7 +164,8 @@ izzi-openclaw/
 │   ├── openclaw-provider.json    # Provider config template
 │   └── models.json               # Agent model definitions
 ├── README.md            # This file
-├── TROUBLESHOOTING.md   # Known issues & fixes
+├── TROUBLESHOOTING.md   # Known issues & fixes (9 bugs documented)
+├── CHANGELOG.md         # Version history
 └── LICENSE              # BSL-1.1
 ```
 
