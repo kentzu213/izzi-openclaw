@@ -223,17 +223,57 @@ docker restart izzi-backend
 
 **Root Cause:** The model ID in your config doesn't match any model registered in the Izzi backend router. Model IDs change over time as new models are added and old ones deprecated.
 
-**Current valid free models (April 2026):**
+**Current valid models (April 2026):**
 
-| Model ID | Provider | Description |
-|----------|----------|-------------|
-| `auto` | Smart Router | Auto-selects best model |
-| `qwen3.6-plus-free` | OpenRouter | Qwen 3.6 Plus (recommended) |
-| `llama-3.3-70b` | Groq | Meta Llama 3.3 70B |
-| `deepseek-r1-free` | OpenRouter | DeepSeek R1 reasoning |
-| `llama-3.1-8b` | Groq/Cerebras | Meta Llama 3.1 8B (fastest) |
+| Model ID | Tier | Description |
+|----------|------|-------------|
+| `auto` | Free | Auto-selects best model |
+| `qwen3-235b` | Free | Qwen3 235B via Cerebras |
+| `llama-3.3-70b` | Free | Meta Llama 3.3 70B via Cerebras |
+| `nemotron-3-super-free` | Free | NVIDIA Nemotron via OpenRouter |
+| `gemini-2.5-flash` | Budget | Google Gemini Flash |
+| `gpt-4.1-mini` | Budget | GPT-4.1 Mini |
+| `REDACTED_MODEL` | Standard | GPT-5.1 via 9Router (30% off) |
+| `gpt-5.1` | Standard | GPT-5.1 |
+| `claude-sonnet-4` | Premium | Claude Sonnet 4 |
+| `gpt-5.4` | Premium | GPT-5.4 |
 
 **Fix:** Re-run the installer to get the latest model list, or manually update your config.
+
+---
+
+## Issue #10: cx/ Prefix Routing Failure (9Router) ⭐ NEW v2.0
+
+**Symptoms:**
+```
+404: No active credentials for provider: openai
+```
+Or: Agent never responds, stuck in loading state.
+
+**Root Cause:** 9Router (the upstream proxy) requires GPT-5.x models to have a `cx/` prefix (e.g., `cx/gpt-5.4`). Without it, 9Router tries to route directly to OpenAI, fails, and returns 404.
+
+**Affected models:**
+| User-facing | Must be sent as |
+|-------------|----------------|
+| `gpt-5.1` | `cx/gpt-5.1` |
+| `gpt-5.2` | `cx/gpt-5.2` |
+| `gpt-5.4` | `cx/gpt-5.4` |
+| `gpt-5.1-codex` | `cx/gpt-5.1-codex` |
+
+**Fix:** This is a **server-side** fix in `router.ts`. The `upstreamModel` field must include the `cx/` prefix. Fixed in v2.0.0.
+
+---
+
+## Issue #11: 9R Model Name Mismatch ⭐ NEW v2.0
+
+**Symptoms:** Using `REDACTED_MODEL` or `REDACTED_MODEL` returns unexpected results or 404.
+
+**Root Cause:** The `9r-` model aliases (e.g., `REDACTED_MODEL`) are mapped to `cx/gpt-5.1` on the backend. Users should know that:
+- `REDACTED_MODEL` = same as `gpt-5.1` but **30% cheaper**
+- `REDACTED_MODEL` = same as `gpt-5.4` but **30% cheaper**
+- `REDACTED_MODEL` = same as `gpt-5.2` but **30% cheaper**
+
+**Fix:** Use `9r-` models for cost savings. They route through the same backend but at discounted pricing.
 
 ---
 
@@ -309,6 +349,8 @@ tail -50 /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
 | 2026-04-07 | CORS duplicate headers | Caddy + Hono both set `Access-Control-Allow-Origin` | ✅ Fixed (server) |
 | 2026-04-07 | Google login 401 "Invalid API key" | Proxy middleware intercepting JWT auth routes | ✅ Fixed (server) |
 | 2026-04-07 | HTTP 404 "Endpoint not found" | Root-level proxy paths missing after auth fix | ✅ Fixed (server) |
+| 2026-04-08 | cx/ prefix 404 on GPT-5.x | 9Router requires `cx/` prefix for free tier | ✅ Fixed (server) |
+| 2026-04-09 | Invalid model IDs in installer | `deepseek-r1-free`, `llama-3.1-8b` not in backend | ✅ Fixed (v2.0.0) |
 
 ---
 

@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] — 2026-04-09
+
+### ⚠️ Breaking Changes
+- **Removed invalid models**: `deepseek-r1-free`, `llama-3.1-8b`, `llama-4-maverick-17b-128e`, `llama-4-scout-17b-16e` — these models do not exist in the backend and caused 404 errors.
+
+### Added
+- **25+ new models** — Total model count: 7 → 30+ (synced from backend `router.ts`)
+- **4-tier pricing system**: Maintained (Free), Budget, Standard, Premium
+- **9R discount models** — `REDACTED_MODEL`, `REDACTED_MODEL`, `REDACTED_MODEL`, `9r-auto` — same premium models at 30% lower price via 9Router free tier
+- **Budget models**: `gemini-2.5-flash-lite`, `gpt-4o-mini`, `gpt-5.4-nano`, `grok-4.1-fast`, `gemini-2.5-flash`, `gpt-4.1-mini`, `gpt-5.4-mini`
+- **Standard models**: `claude-haiku-4.5`, `gpt-5.1`, `gpt-5.1-codex`, `o3-mini`, `gpt-4.1`, `gpt-4o`
+- **Premium models**: `claude-sonnet-4.5`, `claude-opus-4`, `gemini-2.5-pro`, `gpt-5.2`, `grok-4`
+- **Accurate pricing** in `templates/models.json` — costs now match backend rates
+- **Bug #10-11** in TROUBLESHOOTING.md: cx/ prefix routing fix, 9Router model name mismatch
+
+### Fixed
+- **CRITICAL: cx/ prefix routing** — GPT-5.x models in backend now correctly use `cx/` prefix for 9Router, preventing 404 errors
+- **Model pricing mismatch** — `templates/models.json` costs were all `0` for paid models, now shows actual credit costs
+
+### Changed
+- Version bumped to **2.0.0** in `install.ps1` and `install.sh`
+- `templates/openclaw-provider.json` updated to 30 models (was 10)
+- `templates/models.json` updated to 30+ models with pricing (was 7)
+- README.md completely rewritten with model tier tables
+- Installer now registers 12 popular models (up from 7)
+
+
 ## [1.2.0] — 2026-04-07
 
 ### Fixed (Server-Side — No reinstall needed)

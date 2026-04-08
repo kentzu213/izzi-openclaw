@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────
 set -e
 
-VERSION="1.0.0"
+VERSION="2.0.0"
 BASE_URL="https://api.izziapi.com"
 API_KEY=""
 ACTION="install"
@@ -161,12 +161,17 @@ PROVIDER_JSON=$(cat <<PJSON
   "apiKey": "$API_KEY",
   "models": [
     { "id": "auto", "name": "Smart Router (Auto)" },
-    { "id": "llama-3.3-70b", "name": "Llama 3.3 70B" },
-    { "id": "qwen3-235b", "name": "Qwen3 235B" },
-    { "id": "deepseek-r1-free", "name": "DeepSeek R1" },
-    { "id": "llama-3.1-8b", "name": "Llama 3.1 8B (Fast)" },
+    { "id": "llama-3.3-70b", "name": "Llama 3.3 70B (Free)" },
+    { "id": "qwen3-235b", "name": "Qwen3 235B (Free)" },
+    { "id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash" },
+    { "id": "gpt-4.1-mini", "name": "GPT-4.1 Mini" },
+    { "id": "REDACTED_MODEL", "name": "GPT-5.1 via 9R (30% off)" },
+    { "id": "gpt-5.1", "name": "GPT-5.1" },
+    { "id": "claude-haiku-4.5", "name": "Claude Haiku 4.5" },
     { "id": "claude-sonnet-4", "name": "Claude Sonnet 4" },
-    { "id": "gpt-5.4", "name": "GPT-5.4" }
+    { "id": "gpt-5.4", "name": "GPT-5.4" },
+    { "id": "gpt-5.2", "name": "GPT-5.2" },
+    { "id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro" }
   ]
 }
 PJSON
@@ -223,12 +228,17 @@ import json
 with open('$f', 'r') as fh: data = json.load(fh)
 models_list = [
     {'id':'auto','name':'Smart Router (Auto)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'llama-3.3-70b','name':'Llama 3.3 70B','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'qwen3-235b','name':'Qwen3 235B','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'deepseek-r1-free','name':'DeepSeek R1','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'llama-3.1-8b','name':'Llama 3.1 8B (Fast)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'claude-sonnet-4','name':'Claude Sonnet 4','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'gpt-5.4','name':'GPT-5.4','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
+    {'id':'llama-3.3-70b','name':'Llama 3.3 70B (Free)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'qwen3-235b','name':'Qwen3 235B (Free)','reasoning':True,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gemini-2.5-flash','name':'Gemini 2.5 Flash','reasoning':True,'input':['text'],'cost':{'input':0.33,'output':2.75,'cacheRead':0,'cacheWrite':0.04},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gpt-4.1-mini','name':'GPT-4.1 Mini','reasoning':False,'input':['text'],'cost':{REDACTED_COST,'output':1.76,'cacheRead':0,'cacheWrite':0.11},'contextWindow':200000,'maxTokens':16384,'api':'openai-completions'},
+    {'id':'REDACTED_MODEL','name':'GPT-5.1 via 9R (30% off)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,'cacheRead':0,'cacheWrite':0.35},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gpt-5.1','name':'GPT-5.1','reasoning':False,'input':['text'],'cost':{'input':1.10,'output':8.80,'cacheRead':0,'cacheWrite':0.55},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'claude-haiku-4.5','name':'Claude Haiku 4.5','reasoning':False,'input':['text'],'cost':{'input':0.88,'output':4.40,'cacheRead':0,'cacheWrite':0.44},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'claude-sonnet-4','name':'Claude Sonnet 4','reasoning':False,'input':['text'],'cost':{'input':3.30,'output':16.50,'cacheRead':0,'cacheWrite':1.65},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gpt-5.4','name':'GPT-5.4','reasoning':False,'input':['text'],'cost':{'input':2.75,'output':16.50,'cacheRead':0,'cacheWrite':1.38},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gpt-5.2','name':'GPT-5.2','reasoning':True,'input':['text'],'cost':{'input':1.925,'output':15.40,'cacheRead':0,'cacheWrite':0.96},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
+    {'id':'gemini-2.5-pro','name':'Gemini 2.5 Pro','reasoning':True,'input':['text'],'cost':{'input':1.375,'output':11.00,'cacheRead':0,'cacheWrite':0.35},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
 ]
 data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':models_list}
 with open('$f', 'w') as fh:
