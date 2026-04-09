@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] — 2026-04-09
+
+### Added
+- **`install-vps.sh`** — Full VPS/server installer for Ubuntu 20.04+ and Debian 11+
+  - Auto-installs Node.js 20 LTS via NodeSource
+  - Auto-installs OpenClaw globally via npm
+  - Configures Izzi provider with v4.2 verified models
+  - Creates systemd service (`openclaw-gateway`) for auto-restart on boot
+  - System hardening: `NoNewPrivileges`, `ProtectSystem=strict`
+  - Optional UFW firewall config (`--with-ufw`)
+  - Configurable Node version (`--node=22`), port (`--port=8080`)
+- **VPS section in README.md** — One-liner install + service management commands
+- **jq fallback** — VPS installer uses jq (auto-installed) when python3 unavailable
+
+### Security
+- VPS installer follows identical SECURITY-RULES.md contract (6 rules)
+- API key verified server-side BEFORE any system modification
+- Node.js and OpenClaw only installed AFTER key passes validation
+
 ## [2.2.0] — 2026-04-09
 
 ### Breaking Changes

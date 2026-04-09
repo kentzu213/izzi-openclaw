@@ -38,6 +38,12 @@ chmod +x install.sh
 ./install.sh "izzi-YOUR_KEY_HERE"
 ```
 
+**VPS / Server (Ubuntu 20.04+)** 🖥️
+```bash
+curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install-vps.sh | bash -s -- "izzi-YOUR_KEY_HERE"
+```
+> Auto-installs Node.js, OpenClaw, configures Izzi, and creates a systemd service.
+
 ### 3. Restart OpenClaw
 Close and reopen OpenClaw. Select `auto · izzi` as your model, and start chatting!
 
@@ -89,6 +95,35 @@ startup.bat uninstall    :: Disable auto-start
 ```
 
 This creates a Windows Task Scheduler task (`OpenClaw-Gateway-AutoStart`) that runs `openclaw gateway start` at user login with a 30-second delay for network initialization.
+
+## 🖥️ VPS / Server Installation
+
+For headless servers (Ubuntu 20.04+, Debian 11+):
+
+```bash
+# Basic install
+curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install-vps.sh | bash -s -- "izzi-YOUR_KEY"
+
+# With UFW firewall rules
+curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install-vps.sh | bash -s -- "izzi-YOUR_KEY" --with-ufw
+
+# Custom Node.js version + port
+./install-vps.sh "izzi-KEY" --node=22 --port=8080
+```
+
+The VPS installer automatically:
+- Installs Node.js 20 LTS (configurable)
+- Installs OpenClaw globally via npm
+- Configures Izzi provider with v4.2 verified models
+- Creates a **systemd service** (`openclaw-gateway`) for auto-restart
+- Optionally configures UFW firewall
+
+### Service Management
+```bash
+sudo systemctl status openclaw-gateway    # Check status
+sudo systemctl restart openclaw-gateway   # Restart
+sudo journalctl -u openclaw-gateway -f    # View logs
+```
 
 ## 🔧 Troubleshooting
 
@@ -156,7 +191,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
 izzi-openclaw/
 ├── install.bat          # ⭐ Windows CMD installer (recommended)
 ├── install.ps1          # Windows PowerShell installer
-├── install.sh           # macOS/Linux installer
+├── install.sh           # macOS/Linux desktop installer
+├── install-vps.sh       # 🖥️ VPS/Server full installer (Ubuntu/Debian)
 ├── startup.bat          # ⭐ Auto-start manager (Windows)
 ├── startup.ps1          # Task Scheduler automation
 ├── fix.bat              # Windows CMD auto-fix tool
@@ -165,9 +201,11 @@ izzi-openclaw/
 ├── templates/
 │   ├── openclaw-provider.json  # Provider config
 │   └── models.json             # Full agent model definitions (v4.2)
+├── SECURITY-RULES.md    # 🔒 Security contract (6 rules)
 ├── README.md
 ├── TROUBLESHOOTING.md   # Known issues & fixes (13 bugs documented)
 ├── CHANGELOG.md
+├── .gitattributes       # Line ending enforcement
 └── LICENSE              # BSL-1.1
 ```
 
