@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] — 2026-04-09
+
+### Added
+- **Auto-start on Windows boot** — `startup.bat install` creates a Task Scheduler task that runs `openclaw gateway start` at login (30s delay for network)
+- **`startup.ps1` / `startup.bat`** — Manage auto-start: install, uninstall, status
+- **ExecutionPolicy auto-fix** — Installer now detects `Restricted` policy and sets `RemoteSigned` (CurrentUser scope) automatically
+- **Issue #12** in TROUBLESHOOTING.md: PSSecurityException / UnauthorizedAccess
+- **Issue #13** in TROUBLESHOOTING.md: OpenClaw not running after reboot
+
+### Fixed
+- **CRITICAL: PSSecurityException blocks OpenClaw commands** — Windows PowerShell `Restricted` policy prevents `openclaw.ps1` wrapper from running. Both `install.bat` and `install.ps1` now auto-fix this.
+- **Dead models in installer** — Removed ALL non-working models (`llama-3.3-70b`, `qwen3-235b`, `gemini-2.5-flash`, `gpt-4.1-mini`, `claude-sonnet-4`, `gpt-5.1`, `gemini-2.5-pro`, etc.) that 404 on ninerouter
+- **Model list synced to v4.2** — Only E2E verified `cx/` models remain: `REDACTED_MODEL`, `REDACTED_MODEL`, `REDACTED_MODEL`, `REDACTED_MODEL`, `REDACTED_MODEL`, `REDACTED_MODEL`
+
+### Changed
+- Version bumped to **2.1.0** in `install.ps1`
+- `install.bat` now fixes ExecutionPolicy before calling `.ps1`
+- Installer adds Step 6: auto-start prompt during installation
+- Updated valid model table in TROUBLESHOOTING.md
+
 ## [2.0.0] — 2026-04-09
 
 ### ⚠️ Breaking Changes

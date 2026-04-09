@@ -223,20 +223,19 @@ docker restart izzi-backend
 
 **Root Cause:** The model ID in your config doesn't match any model registered in the Izzi backend router. Model IDs change over time as new models are added and old ones deprecated.
 
-**Current valid models (April 2026):**
+**Current valid models (April 2026 — v4.2 verified):**
 
 | Model ID | Tier | Description |
 |----------|------|-------------|
-| `auto` | Free | Auto-selects best model |
-| `qwen3-235b` | Free | Qwen3 235B via Cerebras |
-| `llama-3.3-70b` | Free | Meta Llama 3.3 70B via Cerebras |
-| `nemotron-3-super-free` | Free | NVIDIA Nemotron via OpenRouter |
-| `gemini-2.5-flash` | Budget | Google Gemini Flash |
-| `gpt-4.1-mini` | Budget | GPT-4.1 Mini |
-| `REDACTED_MODEL` | Standard | GPT-5.1 via 9Router (30% off) |
-| `gpt-5.1` | Standard | GPT-5.1 |
-| `claude-sonnet-4` | Premium | Claude Sonnet 4 |
-| `gpt-5.4` | Premium | GPT-5.4 |
+| `auto` | Auto | Smart Router v4.2 — selects best model |
+| `REDACTED_MODEL` | Budget | GPT-5 Mini ($2.80/M out) |
+| `REDACTED_MODEL` | Budget | GPT-5.1 Mini ($3.50/M out) |
+| `REDACTED_MODEL` | Standard | GPT-5.1 ($5.60/M out) |
+| `REDACTED_MODEL` | Standard | GPT-5.1 Codex ($5.60/M out) |
+| `REDACTED_MODEL` | Premium | GPT-5.2 ($9.80/M out) |
+| `REDACTED_MODEL` | Premium | GPT-5.4 ($10.50/M out) |
+
+> **Note:** Models like `llama-3.3-70b`, `qwen3-235b`, `gemini-2.5-flash`, `gpt-4.1-mini` are **no longer available**. Use the `9r-` models instead.
 
 **Fix:** Re-run the installer to get the latest model list, or manually update your config.
 
@@ -274,6 +273,72 @@ Or: Agent never responds, stuck in loading state.
 - `REDACTED_MODEL` = same as `gpt-5.2` but **30% cheaper**
 
 **Fix:** Use `9r-` models for cost savings. They route through the same backend but at discounted pricing.
+
+---
+
+## Issue #12: PowerShell ExecutionPolicy Error (PSSecurityException) ⭐ NEW v2.1
+
+**Symptoms:**
+```
+openclaw : File C:\Users\...\AppData\Roaming\npm\openclaw.ps1 cannot be loaded
+because running scripts is disabled on this system.
+    + CategoryInfo          : SecurityError: (:) [], PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess
+```
+
+**Root Cause:** Windows PowerShell has `ExecutionPolicy` set to `Restricted` by default, which blocks ALL `.ps1` scripts. When OpenClaw is installed via `npm install -g openclaw`, npm creates a `.ps1` wrapper script — which PowerShell refuses to run.
+
+**Fix (Automatic):**
+
+The installer v2.1.0+ automatically fixes this. Re-run:
+```cmd
+install.bat izzi-YOUR_KEY
+```
+
+**Fix (Manual):**
+
+1. Open PowerShell (normal, NOT as admin)
+2. Run:
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+```
+3. Verify:
+```powershell
+Get-ExecutionPolicy -Scope CurrentUser
+# Should output: RemoteSigned
+```
+4. Now `openclaw gateway start` should work.
+
+**What does `RemoteSigned` mean?**
+- ✅ Local scripts (created on your machine) run freely
+- ✅ Downloaded scripts need a digital signature
+- ✅ This is the recommended setting for developers
+- ❌ Does NOT affect system-wide policy (CurrentUser scope only)
+
+---
+
+## Issue #13: OpenClaw Not Running After Reboot ⭐ NEW v2.1
+
+**Symptoms:** After restarting Windows, OpenClaw gateway is not running. You have to manually run `openclaw gateway start` every time.
+
+**Root Cause:** OpenClaw does not auto-start by default.
+
+**Fix:**
+
+Use the auto-start manager:
+```cmd
+startup.bat install
+```
+
+This creates a Windows Task Scheduler task that runs `openclaw gateway start` at every login (with 30s delay for network initialization).
+
+**Management:**
+```cmd
+startup.bat status     :: Check if auto-start is enabled
+startup.bat uninstall  :: Disable auto-start
+```
+
+**Manual alternative:** Open Task Scheduler (`taskschd.msc`) and look for "OpenClaw-Gateway-AutoStart".
 
 ---
 
@@ -351,6 +416,9 @@ tail -50 /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
 | 2026-04-07 | HTTP 404 "Endpoint not found" | Root-level proxy paths missing after auth fix | ✅ Fixed (server) |
 | 2026-04-08 | cx/ prefix 404 on GPT-5.x | 9Router requires `cx/` prefix for free tier | ✅ Fixed (server) |
 | 2026-04-09 | Invalid model IDs in installer | `deepseek-r1-free`, `llama-3.1-8b` not in backend | ✅ Fixed (v2.0.0) |
+| 2026-04-09 | PSSecurityException on Windows | ExecutionPolicy = Restricted blocks .ps1 | ✅ Fixed (v2.1.0) |
+| 2026-04-09 | No auto-start after reboot | OpenClaw doesn't auto-start by default | ✅ Fixed (v2.1.0) |
+| 2026-04-09 | Dead models in installer | Budget models 404 on ninerouter | ✅ Fixed (v2.1.0) |
 
 ---
 

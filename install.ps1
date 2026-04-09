@@ -27,7 +27,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.0"
+$Version = "2.1.0"
 $OC_DIR = Join-Path $env:USERPROFILE ".openclaw"
 $OC_CONFIG = Join-Path $OC_DIR "openclaw.json"
 
@@ -72,6 +72,23 @@ function Backup-File {
 # --- Pre-flight checks ---
 
 Write-Banner
+
+# --- Step 0: Fix ExecutionPolicy (prevents PSSecurityException) ---
+
+try {
+    $currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
+    if ($currentPolicy -eq 'Restricted' -or $currentPolicy -eq 'Undefined') {
+        Write-Host "  [FIX] PowerShell ExecutionPolicy is '$currentPolicy' - fixing..." -ForegroundColor Yellow
+        Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+        Write-Host "  [OK] ExecutionPolicy set to RemoteSigned (CurrentUser)" -ForegroundColor Green
+        Write-Host "        OpenClaw commands will now work in any PowerShell window." -ForegroundColor Gray
+        Write-Host ""
+    }
+} catch {
+    Write-Host "  [WARN] Could not auto-fix ExecutionPolicy. Run manually:" -ForegroundColor Yellow
+    Write-Host "         Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force" -ForegroundColor Gray
+    Write-Host ""
+}
 
 if (-not (Test-Path $OC_DIR)) {
     Write-Host "  [FAIL] OpenClaw not found at $OC_DIR" -ForegroundColor Red
@@ -173,43 +190,33 @@ Write-Host "  API Key:  $($ApiKey.Substring(0, [Math]::Min(16, $ApiKey.Length)))
 Write-Host ""
 
 $step = 1
-$total = 5
+$total = 6
 
-# --- Provider definition (template) ---
+# --- Provider definition (template) — E2E Verified v4.2 Models ---
 
 $providerConfig = @{
     baseUrl = $BaseUrl
     api     = "openai-completions"
     apiKey  = $ApiKey
     models  = @(
-        @{ id = "auto"; name = "Smart Router (Auto)" }
-        @{ id = "llama-3.3-70b"; name = "Llama 3.3 70B (Free)" }
-        @{ id = "qwen3-235b"; name = "Qwen3 235B (Free)" }
-        @{ id = "gemini-2.5-flash"; name = "Gemini 2.5 Flash" }
-        @{ id = "gpt-4.1-mini"; name = "GPT-4.1 Mini" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 via 9R (30% off)" }
-        @{ id = "gpt-5.1"; name = "GPT-5.1" }
-        @{ id = "claude-haiku-4.5"; name = "Claude Haiku 4.5" }
-        @{ id = "claude-sonnet-4"; name = "Claude Sonnet 4" }
-        @{ id = "gpt-5.4"; name = "GPT-5.4" }
-        @{ id = "gpt-5.2"; name = "GPT-5.2" }
-        @{ id = "gemini-2.5-pro"; name = "Gemini 2.5 Pro" }
+        @{ id = "auto"; name = "Smart Router v4.2 (Auto)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5 Mini (Budget)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Mini (Budget)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 (Standard)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Codex (Code)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5.2 (Premium)" }
+        @{ id = "REDACTED_MODEL"; name = "GPT-5.4 (Premium)" }
     )
 }
 
 $agentModelDef = @(
-    @{ id = "auto"; name = "Smart Router (Auto)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "llama-3.3-70b"; name = "Llama 3.3 70B (Free)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "qwen3-235b"; name = "Qwen3 235B (Free)"; reasoning = $true; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gemini-2.5-flash"; name = "Gemini 2.5 Flash"; reasoning = $true; input = @("text"); cost = @{ input = 0.33; output = 2.75; cacheRead = 0; cacheWrite = 0.04 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gpt-4.1-mini"; name = "GPT-4.1 Mini"; reasoning = $false; input = @("text"); cost = @{ input = 0.44; output = 1.76; cacheRead = 0; cacheWrite = 0.11 }; contextWindow = 200000; maxTokens = 16384; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 via 9R (30% off)"; reasoning = $false; input = @("text"); cost = @{ input = 0.70; output = 5.60; cacheRead = 0; cacheWrite = 0.35 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gpt-5.1"; name = "GPT-5.1"; reasoning = $false; input = @("text"); cost = @{ input = 1.10; output = 8.80; cacheRead = 0; cacheWrite = 0.55 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "claude-haiku-4.5"; name = "Claude Haiku 4.5"; reasoning = $false; input = @("text"); cost = @{ input = 0.88; output = 4.40; cacheRead = 0; cacheWrite = 0.44 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "claude-sonnet-4"; name = "Claude Sonnet 4"; reasoning = $false; input = @("text"); cost = @{ input = 3.30; output = 16.50; cacheRead = 0; cacheWrite = 1.65 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gpt-5.4"; name = "GPT-5.4"; reasoning = $false; input = @("text"); cost = @{ input = 2.75; output = 16.50; cacheRead = 0; cacheWrite = 1.38 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gpt-5.2"; name = "GPT-5.2"; reasoning = $true; input = @("text"); cost = @{ input = 1.925; output = 15.40; cacheRead = 0; cacheWrite = 0.96 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "gemini-2.5-pro"; name = "Gemini 2.5 Pro"; reasoning = $true; input = @("text"); cost = @{ input = 1.375; output = 11.00; cacheRead = 0; cacheWrite = 0.35 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "auto"; name = "Smart Router v4.2 (Auto)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5 Mini (Budget)"; reasoning = $false; input = @("text"); cost = @{ input = 0.35; output = 2.80; cacheRead = 0.18; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Mini (Budget)"; reasoning = $false; input = @("text"); cost = @{ input = 0.44; output = 3.50; cacheRead = 0.22; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 (Standard)"; reasoning = $false; input = @("text"); cost = @{ input = 0.70; output = 5.60; cacheRead = 0.35; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Codex (Code)"; reasoning = $false; input = @("text"); cost = @{ input = 0.70; output = 5.60; cacheRead = 0.35; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5.2 (Premium)"; reasoning = $true; input = @("text"); cost = @{ input = 1.225; output = 9.80; cacheRead = 0.613; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+    @{ id = "REDACTED_MODEL"; name = "GPT-5.4 (Premium)"; reasoning = $true; input = @("text"); cost = @{ input = 1.75; output = 10.50; cacheRead = 0.875; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
 )
 
 # --- Step 1: Update openclaw.json ---
@@ -354,11 +361,39 @@ else {
     Write-Ok "Skipped (use -SkipRestart to disable)"
 }
 
+# --- Step 6: Auto-start on Windows boot ---
+
+Write-Step $step $total "Setting up auto-start..."
+
+$startupScript = Join-Path $PSScriptRoot "startup.ps1"
+if (Test-Path $startupScript) {
+    try {
+        $existingTask = Get-ScheduledTask -TaskName "OpenClaw-Gateway-AutoStart" -ErrorAction SilentlyContinue
+        if ($existingTask) {
+            Write-Ok "Auto-start already configured (Task Scheduler)"
+        } else {
+            Write-Host "    Enable auto-start on Windows boot? (OpenClaw gateway starts at login)" -ForegroundColor Yellow
+            $autoStartChoice = Read-Host "    [y/N]"
+            if ($autoStartChoice -match '^[yY]') {
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $startupScript -Install
+            } else {
+                Write-Ok "Skipped. Run 'startup.bat install' later to enable."
+            }
+        }
+    } catch {
+        Write-Warn "Could not check auto-start status. Run 'startup.bat install' manually."
+    }
+} else {
+    Write-Warn "startup.ps1 not found - auto-start setup skipped"
+}
+
+$step++
+
 # --- Done ---
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Cyan
-Write-Host "  [DONE] Installation complete!" -ForegroundColor Green
+Write-Host "  [DONE] Installation complete! (v$Version)" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor White
 Write-Host ""
@@ -368,7 +403,8 @@ Write-Host "  2. Select model 'auto - izzi' in chat" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  3. Send a message - it should work!" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Dashboard: $BaseUrl/dashboard" -ForegroundColor DarkGray
-Write-Host "  Docs:      $BaseUrl/docs" -ForegroundColor DarkGray
-Write-Host "  Issues:    https://github.com/kentzu213/izzi-openclaw/issues" -ForegroundColor DarkGray
+Write-Host "  Auto-start: startup.bat install" -ForegroundColor DarkGray
+Write-Host "  Dashboard:  $BaseUrl/dashboard" -ForegroundColor DarkGray
+Write-Host "  Docs:       $BaseUrl/docs" -ForegroundColor DarkGray
+Write-Host "  Issues:     https://github.com/kentzu213/izzi-openclaw/issues" -ForegroundColor DarkGray
 Write-Host ""
