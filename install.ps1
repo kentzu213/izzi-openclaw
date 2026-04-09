@@ -22,12 +22,11 @@ param(
     [string]$ApiKey = "",
     [string]$BaseUrl = "https://api.izziapi.com",
     [switch]$Uninstall,
-    [switch]$SkipRestart,
-    [switch]$Force
+    [switch]$SkipRestart
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.1.0"
+$Version = "2.2.0"
 $OC_DIR = Join-Path $env:USERPROFILE ".openclaw"
 $OC_CONFIG = Join-Path $OC_DIR "openclaw.json"
 
@@ -177,20 +176,64 @@ if (-not $ApiKey) {
     }
 }
 
-# Validate key format
-if (-not $ApiKey.StartsWith("izzi-")) {
-    if (-not $Force) {
-        Write-Warn "API key does not start with 'izzi-'. Use -Force to override."
-        exit 1
-    }
+# ======================================================
+# SECURITY GATE: Mandatory API Key Validation
+# See SECURITY-RULES.md — Rules #1, #2
+# This block MUST NOT be removed or made optional.
+# ======================================================
+
+# Check 1: Reject placeholder
+if ($ApiKey -eq "YOUR_IZZI_API_KEY") {
+    Write-Err "Invalid placeholder key. Get a real key at: $BaseUrl/dashboard"
+    exit 1
 }
+
+# Check 2: Format — must start with izzi-
+if (-not $ApiKey.StartsWith("izzi-")) {
+    Write-Err "API key must start with 'izzi-'. Get your key at: $BaseUrl/dashboard"
+    exit 1
+}
+
+# Check 3: Minimum length (izzi- + 43 hex = 48 chars)
+if ($ApiKey.Length -lt 48) {
+    Write-Err "API key too short ($($ApiKey.Length) chars, need 48+). Check your key at: $BaseUrl/dashboard"
+    exit 1
+}
+
+# Check 4: BLOCKING server verification (SECURITY-RULES.md Rule #1)
+Write-Host "  Verifying API key with server..." -ForegroundColor White
+try {
+    $verifyUrl = "$BaseUrl/v1/models"
+    $verifyHeaders = @{ "x-api-key" = $ApiKey; "Content-Type" = "application/json" }
+    $verifyResponse = Invoke-RestMethod -Uri $verifyUrl -Headers $verifyHeaders -TimeoutSec 15 -ErrorAction Stop
+    $modelCount = if ($verifyResponse.data) { $verifyResponse.data.Count } else { 0 }
+    Write-Ok "API key verified ($modelCount models available)"
+}
+catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    if ($statusCode -eq 401) {
+        Write-Err "API key is INVALID (server returned 401). Check your key at: $BaseUrl/dashboard"
+    } elseif ($statusCode -eq 403) {
+        Write-Err "API key is REVOKED (server returned 403). Create new key at: $BaseUrl/dashboard"
+    } else {
+        Write-Err "Cannot verify API key (server error: $statusCode). Check network and try again."
+    }
+    Write-Host ""
+    Write-Host "  Installation ABORTED. No config files were modified." -ForegroundColor Red
+    Write-Host ""
+    exit 1
+}
+
+# ==============================
+# END SECURITY GATE
+# ==============================
 
 Write-Host "  Base URL: $BaseUrl" -ForegroundColor Gray
 Write-Host "  API Key:  $($ApiKey.Substring(0, [Math]::Min(16, $ApiKey.Length)))..." -ForegroundColor Gray
 Write-Host ""
 
 $step = 1
-$total = 6
+$total = 5
 
 # --- Provider definition (template) — E2E Verified v4.2 Models ---
 
@@ -326,21 +369,10 @@ if ($fixes -eq 0) {
 
 $step++
 
-# --- Step 4: Connectivity test ---
+# --- Step 3: Connectivity re-check (already verified in Security Gate) ---
 
-Write-Step $step $total "Testing connectivity..."
-
-try {
-    $testUrl = "$BaseUrl/v1/models"
-    $headers = @{ "x-api-key" = $ApiKey; "Content-Type" = "application/json" }
-    $response = Invoke-RestMethod -Uri $testUrl -Headers $headers -TimeoutSec 10 -ErrorAction Stop
-    $modelCount = if ($response.data) { $response.data.Count } else { "?" }
-    Write-Ok "Connected to Izzi API ($modelCount models available)"
-}
-catch {
-    Write-Warn "Could not reach $BaseUrl - this is OK if using localhost"
-    Write-Host "    You can test later with: openclaw models list" -ForegroundColor Gray
-}
+Write-Step $step $total "Confirming API access..."
+Write-Ok "Already verified in pre-flight check"
 
 $step++
 

@@ -2,6 +2,8 @@
 
 Connect [Izzi API](https://izziapi.com) to [OpenClaw](https://tryopenclaw.io) in under 1 minute. Access GPT-5.4, GPT-5.2, GPT-5.1 Codex and more — through a single API key.
 
+> ⚠️ **API key is MANDATORY.** You must have a valid `izzi-` API key before installation. Get one at [izziapi.com/dashboard](https://izziapi.com/dashboard).
+
 ## ⚡ Quick Start
 
 ### 1. Get your API key
@@ -23,7 +25,12 @@ cd izzi-openclaw
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -ApiKey "izzi-YOUR_KEY_HERE"
 ```
 
-**macOS / Linux**
+**macOS / Linux** ⭐ One-liner
+```bash
+curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install.sh | bash -s -- "izzi-YOUR_KEY_HERE"
+```
+
+**macOS / Linux** (manual clone)
 ```bash
 git clone https://github.com/kentzu213/izzi-openclaw.git
 cd izzi-openclaw
@@ -62,12 +69,12 @@ All models are verified working on production. Use `auto` for best value.
 ## 🛠️ What the installer does
 
 The installer automatically:
+- **Verifies API key with server** (BLOCKING — invalid key = abort)
 - Fixes PowerShell ExecutionPolicy (prevents PSSecurityException)
 - Sets `baseUrl` to `https://api.izziapi.com`
 - Injects your API key into OpenClaw config
 - Registers 7 verified models in all agent configs
 - Removes `/v1` suffix if present (prevents double-prefix bug)
-- Tests connectivity to Izzi API
 - Restarts OpenClaw gateway
 - Optionally sets up auto-start on Windows boot
 
@@ -165,9 +172,15 @@ izzi-openclaw/
 ```
 
 ## 🔐 Security
-- No API keys are stored in this repo — keys are only written to your local OpenClaw config
-- Backups created before any config modification (`.bak` files)
-- Key validation ensures proper `izzi-` prefix format
+
+**See [SECURITY-RULES.md](SECURITY-RULES.md) for the full security contract.**
+
+- ✅ API key verified with server BEFORE any config write
+- ✅ Invalid/expired/revoked keys are rejected immediately
+- ✅ No API keys stored in this repo — keys only in local config
+- ✅ Backups created before config modification (`.bak` files)
+- ✅ Strict format enforcement: `izzi-` prefix + 48+ chars
+- ❌ No `-Force` bypass for key validation
 
 ## 📄 License
 This project is licensed under the [Business Source License 1.1](LICENSE).

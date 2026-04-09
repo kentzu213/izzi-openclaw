@@ -1,0 +1,16 @@
+# Line ending normalization for izzi-openclaw
+# See SECURITY-RULES.md — these settings prevent CRLF corruption on macOS
+
+# Shell scripts MUST use LF (Unix) — CRLF breaks bash on macOS/Linux
+*.sh   text eol=lf
+
+# Windows scripts use CRLF
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# JSON/Markdown — normalize to LF
+*.json text eol=lf
+*.md   text eol=lf
+
+# Keep .gitattributes itself as LF
+.gitattributes text eol=lf

@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] — 2026-04-09
+
+### Breaking Changes
+- **REMOVED `-Force` flag** — Key validation can no longer be bypassed
+- **API key verification is now BLOCKING** — Installer will abort if key is invalid/revoked/unreachable
+
+### Added
+- **SECURITY-RULES.md** — Permanent security contract for this repo. Defines 6 immutable rules
+- **Mandatory server-side API key verification** — Installer calls `GET /v1/models` with key BEFORE writing any config
+- **Format enforcement** — API key must: start with `izzi-`, be 48+ chars, not be placeholder
+- **macOS curl one-liner** — `curl -fsSL ...install.sh | bash -s -- "izzi-KEY"`
+- **.gitattributes** — Enforces LF for `.sh` files, CRLF for `.bat/.ps1`
+
+### Fixed
+- **CRITICAL: install.sh CRLF line endings** — Windows line endings broke bash on macOS
+- **CRITICAL: install.sh allowed invalid API keys** — Only warned but continued installation
+- **install.sh dead models** — Synced from v2.0.0 (12 dead) to v4.2 verified (7 working)
+- **openclaw-provider.json** — Pruned 30 dead models to 7 verified v4.2
+
+### Changed
+- Version bumped to **2.2.0** in `install.ps1` and `install.sh`
+- Connectivity test moved from Step 4 to pre-flight Security Gate
+- install.sh now uses v4.2 cx/ model namespace
+
 ## [2.1.0] — 2026-04-09
 
 ### Added
@@ -24,7 +48,7 @@ All notable changes to this project will be documented in this file.
 
 ## [2.0.0] — 2026-04-09
 
-### ⚠️ Breaking Changes
+### Breaking Changes
 - **Removed invalid models**: `deepseek-r1-free`, `llama-3.1-8b`, `llama-4-maverick-17b-128e`, `llama-4-scout-17b-16e` — these models do not exist in the backend and caused 404 errors.
 
 ### Added
