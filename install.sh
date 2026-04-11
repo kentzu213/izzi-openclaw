@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# Izzi × OpenClaw Connector — macOS/Linux Installer v2.2.0
+# Izzi × OpenClaw Connector — macOS/Linux Installer v3.0.0
 # Usage:
 #   ./install.sh "izzi-YOUR_API_KEY"
 #   curl -fsSL https://raw.githubusercontent.com/.../install.sh | bash -s -- "izzi-KEY"
+#
+# Model configs are fetched from the Izzi API server at install time.
+# This script does NOT contain model IDs, pricing, or architecture details.
 # ─────────────────────────────────────────────────────────────
 set -e
 
-VERSION="2.2.0"
+VERSION="3.0.0"
 BASE_URL="https://api.izziapi.com"
 API_KEY=""
 ACTION="install"
@@ -134,7 +137,7 @@ if [ -z "$API_KEY" ]; then
   if [ -z "$API_KEY" ]; then
     echo ""
     err "No API key provided."
-    echo "  Get your key at: $BASE_URL/dashboard"
+    echo "  Get your key at: https://izziapi.com/dashboard"
     echo ""
     exit 1
   fi
@@ -143,7 +146,7 @@ fi
 
 # Check 1: Reject placeholder
 if [ "$API_KEY" = "YOUR_IZZI_API_KEY" ]; then
-  err "Invalid placeholder key. Get a real key at: $BASE_URL/dashboard"
+  err "Invalid placeholder key. Get a real key at: https://izziapi.com/dashboard"
   exit 1
 fi
 
@@ -151,7 +154,7 @@ fi
 case "$API_KEY" in
   izzi-*) ;;
   *)
-    err "API key must start with 'izzi-'. Get your key at: $BASE_URL/dashboard"
+    err "API key must start with 'izzi-'. Get your key at: https://izziapi.com/dashboard"
     exit 1
     ;;
 esac
@@ -159,7 +162,7 @@ esac
 # Check 3: Minimum length (izzi- + 43 hex = 48 chars)
 KEY_LEN=${#API_KEY}
 if [ "$KEY_LEN" -lt 48 ]; then
-  err "API key too short ($KEY_LEN chars, need 48+). Check your key at: $BASE_URL/dashboard"
+  err "API key too short ($KEY_LEN chars, need 48+). Check your key at: https://izziapi.com/dashboard"
   exit 1
 fi
 
@@ -174,13 +177,13 @@ if command -v curl >/dev/null 2>&1; then
   if [ "$HTTP_CODE" = "200" ]; then
     ok "API key verified (HTTP 200)"
   elif [ "$HTTP_CODE" = "401" ]; then
-    err "API key is INVALID (server returned 401). Check your key at: $BASE_URL/dashboard"
+    err "API key is INVALID (server returned 401). Check your key at: https://izziapi.com/dashboard"
     echo ""
     echo "  Installation ABORTED. No config files were modified."
     echo ""
     exit 1
   elif [ "$HTTP_CODE" = "403" ]; then
-    err "API key is REVOKED (server returned 403). Create new key at: $BASE_URL/dashboard"
+    err "API key is REVOKED (server returned 403). Create new key at: https://izziapi.com/dashboard"
     echo ""
     echo "  Installation ABORTED. No config files were modified."
     echo ""
@@ -205,38 +208,69 @@ echo "  Base URL: $BASE_URL"
 echo "  API Key:  ${API_KEY:0:16}..."
 echo ""
 
+# ═════════════════════════════════════════════════════════
+# PROVISION: Fetch config from server
+# Model definitions and pricing are NOT stored in this script.
+# They are fetched securely from the Izzi API at install time.
+# ═════════════════════════════════════════════════════════
+
+echo "  Fetching configuration from server..."
+PROVISION_JSON=""
+if command -v curl >/dev/null 2>&1; then
+  PROVISION_JSON=$(curl -s -X POST \
+    -H "x-api-key: $API_KEY" \
+    -H "Content-Type: application/json" \
+    -H "User-Agent: izzi-installer/$VERSION (bash)" \
+    -H "X-Installer-Version: $VERSION" \
+    -H "X-Platform: $(uname -s | tr '[:upper:]' '[:lower:]')" \
+    -d "{\"installer_version\":\"$VERSION\",\"platform\":\"$(uname -s | tr '[:upper:]' '[:lower:]')\"}" \
+    "$BASE_URL/v1/provision" 2>/dev/null || echo "")
+fi
+
+# Check if provision succeeded
+PROVISION_OK=false
+if [ -n "$PROVISION_JSON" ] && echo "$PROVISION_JSON" | grep -q '"provider"' 2>/dev/null; then
+  MODEL_COUNT=$(echo "$PROVISION_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('agent_models',[])))" 2>/dev/null || echo "0")
+  ok "Configuration received ($MODEL_COUNT models)"
+  PROVISION_OK=true
+else
+  warn "Could not fetch config from server. Using fallback mode..."
+fi
+
 TOTAL=4
 
-# ─── Step 1: Update openclaw.json (E2E Verified v4.2 Models) ───
+# ─── Step 1: Update openclaw.json ───
 
 step 1 $TOTAL "Updating openclaw.json..."
-
-PROVIDER_JSON=$(cat <<PJSON
-{
-  "baseUrl": "$BASE_URL",
-  "api": "openai-completions",
-  "apiKey": "$API_KEY",
-  "models": [
-    { "id": "auto", "name": "Smart Router v4.2 (Auto)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5 Mini (Budget)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 Mini (Budget)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 (Standard)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 Codex (Code)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.2 (Premium)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.4 (Premium)" }
-  ]
-}
-PJSON
-)
 
 if [ -f "$OC_CONFIG" ]; then
   backup_file "$OC_CONFIG"
 
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+    if [ "$PROVISION_OK" = true ]; then
+      # Use server-provided config
+      python3 -c "
+import json, sys
+with open('$OC_CONFIG', 'r') as f: data = json.load(f)
+provision = json.loads('''$PROVISION_JSON''')
+provider_cfg = provision.get('provider', {})
+provider_cfg['apiKey'] = '$API_KEY'
+provider_cfg['baseUrl'] = '$BASE_URL'
+if 'models' not in data: data['models'] = {}
+if 'providers' not in data['models']: data['models']['providers'] = {}
+data['models']['providers']['izzi'] = provider_cfg
+if 'agents' in data and 'defaults' in data['agents'] and 'model' in data['agents']['defaults']:
+    data['agents']['defaults']['model']['primary'] = 'izzi/auto'
+with open('$OC_CONFIG', 'w') as f:
+    json.dump(data, f, indent=2); f.write('\n')
+print('    ✓ Added izzi provider + set default to izzi/auto')
+" 2>/dev/null || warn "python3 failed — trying node..."
+    else
+      # Fallback: minimal auto-only config
+      python3 -c "
 import json
 with open('$OC_CONFIG', 'r') as f: data = json.load(f)
-provider = json.loads('''$PROVIDER_JSON''')
+provider = {'baseUrl':'$BASE_URL','api':'openai-completions','apiKey':'$API_KEY','models':[{'id':'auto','name':'Smart Router (Auto)'}]}
 if 'models' not in data: data['models'] = {}
 if 'providers' not in data['models']: data['models']['providers'] = {}
 data['models']['providers']['izzi'] = provider
@@ -244,15 +278,20 @@ if 'agents' in data and 'defaults' in data['agents'] and 'model' in data['agents
     data['agents']['defaults']['model']['primary'] = 'izzi/auto'
 with open('$OC_CONFIG', 'w') as f:
     json.dump(data, f, indent=2); f.write('\n')
-print('    ✓ Added izzi provider + set default to izzi/auto')
-" 2>/dev/null || warn "python3 failed — trying node..."
+print('    ✓ Added izzi provider (fallback mode)')
+" 2>/dev/null || warn "python3 failed"
+    fi
   fi
 
   if command -v node >/dev/null 2>&1 && ! grep -q '"izzi"' "$OC_CONFIG" 2>/dev/null; then
-    node -e "
+    if [ "$PROVISION_OK" = true ]; then
+      node -e "
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync('$OC_CONFIG', 'utf8'));
-const provider = JSON.parse(\`$PROVIDER_JSON\`);
+const provision = JSON.parse(\`$PROVISION_JSON\`);
+const provider = provision.provider || {};
+provider.apiKey = '$API_KEY';
+provider.baseUrl = '$BASE_URL';
 if (!data.models) data.models = {};
 if (!data.models.providers) data.models.providers = {};
 data.models.providers.izzi = provider;
@@ -260,33 +299,50 @@ if (data.agents?.defaults?.model) data.agents.defaults.model.primary = 'izzi/aut
 fs.writeFileSync('$OC_CONFIG', JSON.stringify(data, null, 2) + '\n');
 console.log('    ✓ Added izzi provider + set default to izzi/auto');
 " 2>/dev/null || warn "Could not update openclaw.json"
+    else
+      node -e "
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync('$OC_CONFIG', 'utf8'));
+const provider = {baseUrl:'$BASE_URL',api:'openai-completions',apiKey:'$API_KEY',models:[{id:'auto',name:'Smart Router (Auto)'}]};
+if (!data.models) data.models = {};
+if (!data.models.providers) data.models.providers = {};
+data.models.providers.izzi = provider;
+if (data.agents?.defaults?.model) data.agents.defaults.model.primary = 'izzi/auto';
+fs.writeFileSync('$OC_CONFIG', JSON.stringify(data, null, 2) + '\n');
+console.log('    ✓ Added izzi provider (fallback mode)');
+" 2>/dev/null || warn "Could not update openclaw.json"
+    fi
   fi
 else
   warn "openclaw.json not found — run 'openclaw setup' first"
 fi
 
-# ─── Step 2: Update agent configs (v4.2 Verified) ───
+# ─── Step 2: Update agent configs ───
 step 2 $TOTAL "Updating agent configs..."
 
 find "$OC_DIR/agents" -name "models.json" -path "*/agent/*" 2>/dev/null | while read -r f; do
   backup_file "$f"
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+    if [ "$PROVISION_OK" = true ]; then
+      python3 -c "
 import json
 with open('$f', 'r') as fh: data = json.load(fh)
-models_list = [
-    {'id':'auto','name':'Smart Router v4.2 (Auto)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5 Mini (Budget)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 Mini (Budget)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 (Standard)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 Codex (Code)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.2 (Premium)','reasoning':True,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.4 (Premium)','reasoning':True,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
-]
-data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':models_list}
+provision = json.loads('''$PROVISION_JSON''')
+agent_models = provision.get('agent_models', [])
+data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':agent_models}
 with open('$f', 'w') as fh:
     json.dump(data, fh, indent=2); fh.write('\n')
 " 2>/dev/null && ok "$(basename $(dirname $(dirname "$f")))/agent/models.json"
+    else
+      python3 -c "
+import json
+with open('$f', 'r') as fh: data = json.load(fh)
+auto_model = {'id':'auto','name':'Smart Router (Auto)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
+data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':[auto_model]}
+with open('$f', 'w') as fh:
+    json.dump(data, fh, indent=2); fh.write('\n')
+" 2>/dev/null && ok "$(basename $(dirname $(dirname "$f")))/agent/models.json (fallback)"
+    fi
   fi
 done
 
@@ -323,7 +379,7 @@ echo "  2. Select model 'auto · izzi' in chat"
 echo ""
 echo "  3. Send a message — it should work!"
 echo ""
-echo "  Dashboard: $BASE_URL/dashboard"
-echo "  Docs:      $BASE_URL/docs"
+echo "  Dashboard: https://izziapi.com/dashboard"
+echo "  Docs:      https://izziapi.com/docs"
 echo "  Issues:    https://github.com/kentzu213/izzi-openclaw/issues"
 echo ""

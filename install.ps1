@@ -4,10 +4,11 @@
 .DESCRIPTION
     Connects your Izzi API key to OpenClaw so all agents can use Izzi models.
     Applies known compatibility fixes automatically.
+    Model configs are fetched securely from the Izzi API server.
 .PARAMETER ApiKey
     Your Izzi API key (starts with "izzi-"). Get one at https://izziapi.com/dashboard
 .PARAMETER BaseUrl
-    API base URL. Default: https://izziapi.com
+    API base URL. Default: https://api.izziapi.com
 .PARAMETER Uninstall
     Remove Izzi provider from OpenClaw config.
 .EXAMPLE
@@ -26,7 +27,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.2.0"
+$Version = "3.0.0"
 $OC_DIR = Join-Path $env:USERPROFILE ".openclaw"
 $OC_CONFIG = Join-Path $OC_DIR "openclaw.json"
 
@@ -170,7 +171,7 @@ if (-not $ApiKey) {
     if (-not $ApiKey) {
         Write-Host ""
         Write-Err "No API key provided."
-        Write-Host "  Get your key at: $BaseUrl/dashboard" -ForegroundColor Gray
+        Write-Host "  Get your key at: https://izziapi.com/dashboard" -ForegroundColor Gray
         Write-Host ""
         exit 1
     }
@@ -184,19 +185,19 @@ if (-not $ApiKey) {
 
 # Check 1: Reject placeholder
 if ($ApiKey -eq "YOUR_IZZI_API_KEY") {
-    Write-Err "Invalid placeholder key. Get a real key at: $BaseUrl/dashboard"
+    Write-Err "Invalid placeholder key. Get a real key at: https://izziapi.com/dashboard"
     exit 1
 }
 
 # Check 2: Format — must start with izzi-
 if (-not $ApiKey.StartsWith("izzi-")) {
-    Write-Err "API key must start with 'izzi-'. Get your key at: $BaseUrl/dashboard"
+    Write-Err "API key must start with 'izzi-'. Get your key at: https://izziapi.com/dashboard"
     exit 1
 }
 
 # Check 3: Minimum length (izzi- + 43 hex = 48 chars)
 if ($ApiKey.Length -lt 48) {
-    Write-Err "API key too short ($($ApiKey.Length) chars, need 48+). Check your key at: $BaseUrl/dashboard"
+    Write-Err "API key too short ($($ApiKey.Length) chars, need 48+). Check your key at: https://izziapi.com/dashboard"
     exit 1
 }
 
@@ -212,9 +213,9 @@ try {
 catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
     if ($statusCode -eq 401) {
-        Write-Err "API key is INVALID (server returned 401). Check your key at: $BaseUrl/dashboard"
+        Write-Err "API key is INVALID (server returned 401). Check your key at: https://izziapi.com/dashboard"
     } elseif ($statusCode -eq 403) {
-        Write-Err "API key is REVOKED (server returned 403). Create new key at: $BaseUrl/dashboard"
+        Write-Err "API key is REVOKED (server returned 403). Create new key at: https://izziapi.com/dashboard"
     } else {
         Write-Err "Cannot verify API key (server error: $statusCode). Check network and try again."
     }
@@ -222,6 +223,39 @@ catch {
     Write-Host "  Installation ABORTED. No config files were modified." -ForegroundColor Red
     Write-Host ""
     exit 1
+}
+
+# Check 5: ADMIN KEY REJECTION (prevents admin key leaks — see SECURITY-RULES.md)
+# After confirming the key is valid, verify it's NOT an admin key
+Write-Host "  Checking key ownership..." -ForegroundColor White
+try {
+    $keyInfoUrl = "$BaseUrl/v1/key-info"
+    $keyInfoHeaders = @{ "x-api-key" = $ApiKey; "Content-Type" = "application/json" }
+    $keyInfo = Invoke-RestMethod -Uri $keyInfoUrl -Headers $keyInfoHeaders -TimeoutSec 10 -ErrorAction Stop
+    
+    if ($keyInfo.role -eq "admin") {
+        Write-Host ""
+        Write-Err "SECURITY BLOCKED: This is an ADMIN API key!"
+        Write-Host ""
+        Write-Host "    Admin keys must NOT be used in customer installations." -ForegroundColor Red
+        Write-Host "    Using admin keys on external machines creates security risks." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "    Instead, create a USER-level key:" -ForegroundColor Yellow
+        Write-Host "      1. Log in at https://izziapi.com/dashboard" -ForegroundColor Gray
+        Write-Host "      2. Go to 'API Keys' and create a new key" -ForegroundColor Gray
+        Write-Host "      3. Use that key with this installer" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  Installation ABORTED. No config files were modified." -ForegroundColor Red
+        Write-Host ""
+        exit 1
+    }
+    
+    # Show key owner info for confirmation
+    Write-Ok "Key verified: $($keyInfo.key_name) ($($keyInfo.email_masked)) [Plan: $($keyInfo.plan)]"
+}
+catch {
+    # /v1/key-info not available — warn but continue (backward compatibility)
+    Write-Warn "Could not verify key ownership (server may need update). Proceeding..."
 }
 
 # ==============================
@@ -232,35 +266,41 @@ Write-Host "  Base URL: $BaseUrl" -ForegroundColor Gray
 Write-Host "  API Key:  $($ApiKey.Substring(0, [Math]::Min(16, $ApiKey.Length)))..." -ForegroundColor Gray
 Write-Host ""
 
-$step = 1
-$total = 5
+# ==============================
+# PROVISION: Fetch config from server
+# Model definitions, pricing, and agent configs are NOT stored in this script.
+# They are fetched securely from the Izzi API at install time.
+# ==============================
 
-# --- Provider definition (template) — E2E Verified v4.2 Models ---
-
-$providerConfig = @{
-    baseUrl = $BaseUrl
-    api     = "openai-completions"
-    apiKey  = $ApiKey
-    models  = @(
-        @{ id = "auto"; name = "Smart Router v4.2 (Auto)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5 Mini (Budget)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Mini (Budget)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 (Standard)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Codex (Code)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.2 (Premium)" }
-        @{ id = "REDACTED_MODEL"; name = "GPT-5.4 (Premium)" }
-    )
+Write-Host "  Fetching configuration from server..." -ForegroundColor White
+$provisionData = $null
+try {
+    $provisionUrl = "$BaseUrl/v1/provision"
+    $provisionHeaders = @{
+        "x-api-key" = $ApiKey
+        "Content-Type" = "application/json"
+        "User-Agent" = "izzi-installer/$Version (PowerShell)"
+        "X-Installer-Version" = $Version
+        "X-Platform" = "windows"
+    }
+    $provisionBody = @{
+        installer_version = $Version
+        platform = "windows"
+    } | ConvertTo-Json
+    $provisionData = Invoke-RestMethod -Uri $provisionUrl -Method Post -Headers $provisionHeaders -Body $provisionBody -TimeoutSec 20 -ErrorAction Stop
+    Write-Ok "Configuration received ($($provisionData.agent_models.Count) models)"
+}
+catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    if ($statusCode -eq 429) {
+        Write-Err "Rate limited. Please wait a moment and try again."
+    } else {
+        Write-Warn "Could not fetch config from server (error: $statusCode). Using fallback mode..."
+    }
 }
 
-$agentModelDef = @(
-    @{ id = "auto"; name = "Smart Router v4.2 (Auto)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5 Mini (Budget)"; reasoning = $false; input = @("text"); cost = @{ input = 0.35; output = 2.80; cacheRead = 0.18; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Mini (Budget)"; reasoning = $false; input = @("text"); cost = @{ input = 0.44; output = 3.50; cacheRead = 0.22; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 (Standard)"; reasoning = $false; input = @("text"); cost = @{ input = 0.70; output = 5.60; cacheRead = 0.35; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.1 Codex (Code)"; reasoning = $false; input = @("text"); cost = @{ input = 0.70; output = 5.60; cacheRead = 0.35; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.2 (Premium)"; reasoning = $true; input = @("text"); cost = @{ input = 1.225; output = 9.80; cacheRead = 0.613; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-    @{ id = "REDACTED_MODEL"; name = "GPT-5.4 (Premium)"; reasoning = $true; input = @("text"); cost = @{ input = 1.75; output = 10.50; cacheRead = 0.875; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
-)
+$step = 1
+$total = 5
 
 # --- Step 1: Update openclaw.json ---
 
@@ -276,6 +316,27 @@ if (Test-Path $OC_CONFIG) {
     }
     if (-not $config.models.providers) {
         $config.models | Add-Member -NotePropertyName "providers" -NotePropertyValue ([PSCustomObject]@{})
+    }
+
+    # Build provider config from server data or fallback
+    if ($provisionData -and $provisionData.provider) {
+        $providerConfig = @{
+            baseUrl = $BaseUrl
+            api     = $provisionData.provider.api
+            apiKey  = $ApiKey
+            models  = $provisionData.provider.models
+        }
+    } else {
+        # Fallback: minimal config (server will resolve models at runtime)
+        $providerConfig = @{
+            baseUrl = $BaseUrl
+            api     = "openai-completions"
+            apiKey  = $ApiKey
+            models  = @(
+                @{ id = "auto"; name = "Smart Router (Auto)" }
+            )
+        }
+        Write-Warn "Using minimal fallback config. Re-run installer when server is available for full model list."
     }
 
     # Add/update izzi provider
@@ -314,6 +375,16 @@ foreach ($agent in $agentDirs) {
     if (Test-Path $modelsFile) {
         Backup-File $modelsFile
         $models = Get-Content $modelsFile -Raw | ConvertFrom-Json
+
+        # Build agent model definitions from server data or fallback
+        if ($provisionData -and $provisionData.agent_models) {
+            $agentModelDef = $provisionData.agent_models
+        } else {
+            # Fallback: auto-only
+            $agentModelDef = @(
+                @{ id = "auto"; name = "Smart Router (Auto)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+            )
+        }
 
         # Add/update izzi provider with full model definitions
         $izziAgent = [PSCustomObject]@{
@@ -369,7 +440,7 @@ if ($fixes -eq 0) {
 
 $step++
 
-# --- Step 3: Connectivity re-check (already verified in Security Gate) ---
+# --- Step 4: Connectivity re-check (already verified in Security Gate) ---
 
 Write-Step $step $total "Confirming API access..."
 Write-Ok "Already verified in pre-flight check"
@@ -393,34 +464,6 @@ else {
     Write-Ok "Skipped (use -SkipRestart to disable)"
 }
 
-# --- Step 6: Auto-start on Windows boot ---
-
-Write-Step $step $total "Setting up auto-start..."
-
-$startupScript = Join-Path $PSScriptRoot "startup.ps1"
-if (Test-Path $startupScript) {
-    try {
-        $existingTask = Get-ScheduledTask -TaskName "OpenClaw-Gateway-AutoStart" -ErrorAction SilentlyContinue
-        if ($existingTask) {
-            Write-Ok "Auto-start already configured (Task Scheduler)"
-        } else {
-            Write-Host "    Enable auto-start on Windows boot? (OpenClaw gateway starts at login)" -ForegroundColor Yellow
-            $autoStartChoice = Read-Host "    [y/N]"
-            if ($autoStartChoice -match '^[yY]') {
-                & powershell -NoProfile -ExecutionPolicy Bypass -File $startupScript -Install
-            } else {
-                Write-Ok "Skipped. Run 'startup.bat install' later to enable."
-            }
-        }
-    } catch {
-        Write-Warn "Could not check auto-start status. Run 'startup.bat install' manually."
-    }
-} else {
-    Write-Warn "startup.ps1 not found - auto-start setup skipped"
-}
-
-$step++
-
 # --- Done ---
 
 Write-Host ""
@@ -435,8 +478,7 @@ Write-Host "  2. Select model 'auto - izzi' in chat" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  3. Send a message - it should work!" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Auto-start: startup.bat install" -ForegroundColor DarkGray
-Write-Host "  Dashboard:  $BaseUrl/dashboard" -ForegroundColor DarkGray
-Write-Host "  Docs:       $BaseUrl/docs" -ForegroundColor DarkGray
+Write-Host "  Dashboard:  https://izziapi.com/dashboard" -ForegroundColor DarkGray
+Write-Host "  Docs:       https://izziapi.com/docs" -ForegroundColor DarkGray
 Write-Host "  Issues:     https://github.com/kentzu213/izzi-openclaw/issues" -ForegroundColor DarkGray
 Write-Host ""

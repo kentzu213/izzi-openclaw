@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# Izzi × OpenClaw Connector — VPS Ubuntu Installer v2.3.0
+# Izzi × OpenClaw Connector — VPS Ubuntu Installer v3.0.0
 #
 # Full headless installer for VPS/server environments.
 # Installs Node.js, OpenClaw, configures Izzi provider,
 # and creates a systemd service for auto-restart.
+#
+# Model configs are fetched from the Izzi API server at install time.
+# This script does NOT contain model IDs, pricing, or architecture details.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install-vps.sh | bash -s -- "izzi-YOUR_KEY"
@@ -15,7 +18,7 @@
 # ─────────────────────────────────────────────────────────────
 set -e
 
-VERSION="2.3.0"
+VERSION="3.0.0"
 BASE_URL="https://api.izziapi.com"
 API_KEY=""
 WITH_UFW=false
@@ -99,7 +102,7 @@ if [ -z "$API_KEY" ]; then
   if [ -z "$API_KEY" ]; then
     echo ""
     err "No API key provided."
-    echo "  Get your key at: $BASE_URL/dashboard"
+    echo "  Get your key at: https://izziapi.com/dashboard"
     echo ""
     exit 1
   fi
@@ -108,7 +111,7 @@ fi
 
 # Check 1: Reject placeholder
 if [ "$API_KEY" = "YOUR_IZZI_API_KEY" ]; then
-  err "Invalid placeholder key. Get a real key at: $BASE_URL/dashboard"
+  err "Invalid placeholder key. Get a real key at: https://izziapi.com/dashboard"
   exit 1
 fi
 
@@ -116,7 +119,7 @@ fi
 case "$API_KEY" in
   izzi-*) ;;
   *)
-    err "API key must start with 'izzi-'. Get your key at: $BASE_URL/dashboard"
+    err "API key must start with 'izzi-'. Get your key at: https://izziapi.com/dashboard"
     exit 1
     ;;
 esac
@@ -124,7 +127,7 @@ esac
 # Check 3: Minimum length (izzi- + 43 hex = 48 chars)
 KEY_LEN=${#API_KEY}
 if [ "$KEY_LEN" -lt 48 ]; then
-  err "API key too short ($KEY_LEN chars, need 48+). Check your key at: $BASE_URL/dashboard"
+  err "API key too short ($KEY_LEN chars, need 48+). Check your key at: https://izziapi.com/dashboard"
   exit 1
 fi
 
@@ -139,13 +142,13 @@ if command -v curl >/dev/null 2>&1; then
   if [ "$HTTP_CODE" = "200" ]; then
     ok "API key verified (HTTP 200)"
   elif [ "$HTTP_CODE" = "401" ]; then
-    err "API key is INVALID (server returned 401). Check your key at: $BASE_URL/dashboard"
+    err "API key is INVALID (server returned 401). Check your key at: https://izziapi.com/dashboard"
     echo ""
     echo "  Installation ABORTED. No changes were made to your system."
     echo ""
     exit 1
   elif [ "$HTTP_CODE" = "403" ]; then
-    err "API key is REVOKED (server returned 403). Create new key at: $BASE_URL/dashboard"
+    err "API key is REVOKED (server returned 403). Create new key at: https://izziapi.com/dashboard"
     echo ""
     echo "  Installation ABORTED. No changes were made to your system."
     echo ""
@@ -264,35 +267,66 @@ fi
 
 ok "OpenClaw directory: $OC_DIR"
 
-# ─── Step 4: Configure Izzi provider (v4.2 Verified Models) ───
-step 4 $TOTAL "Configuring Izzi provider..."
+# ═════════════════════════════════════════════════════════
+# PROVISION: Fetch config from server
+# Model definitions and pricing are NOT stored in this script.
+# They are fetched securely from the Izzi API at install time.
+# ═════════════════════════════════════════════════════════
 
-PROVIDER_JSON=$(cat <<PJSON
-{
-  "baseUrl": "$BASE_URL",
-  "api": "openai-completions",
-  "apiKey": "$API_KEY",
-  "models": [
-    { "id": "auto", "name": "Smart Router v4.2 (Auto)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5 Mini (Budget)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 Mini (Budget)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 (Standard)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.1 Codex (Code)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.2 (Premium)" },
-    { "id": "REDACTED_MODEL", "name": "GPT-5.4 (Premium)" }
-  ]
-}
-PJSON
-)
+echo "  Fetching configuration from server..."
+PROVISION_JSON=""
+PROVISION_JSON=$(curl -s -X POST \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "User-Agent: izzi-installer/$VERSION (bash-vps)" \
+  -H "X-Installer-Version: $VERSION" \
+  -H "X-Platform: $(uname -s | tr '[:upper:]' '[:lower:]')-vps" \
+  -d "{\"installer_version\":\"$VERSION\",\"platform\":\"$(uname -s | tr '[:upper:]' '[:lower:]')-vps\"}" \
+  "$BASE_URL/v1/provision" 2>/dev/null || echo "")
+
+# Check if provision succeeded
+PROVISION_OK=false
+if [ -n "$PROVISION_JSON" ] && echo "$PROVISION_JSON" | grep -q '"provider"' 2>/dev/null; then
+  MODEL_COUNT=$(echo "$PROVISION_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('agent_models',[])))" 2>/dev/null || echo "0")
+  ok "Configuration received ($MODEL_COUNT models)"
+  PROVISION_OK=true
+else
+  warn "Could not fetch config from server. Using fallback mode..."
+fi
+
+# ─── Step 4: Configure Izzi provider ───
+step 4 $TOTAL "Configuring Izzi provider..."
 
 if [ -f "$OC_CONFIG" ]; then
   backup_file "$OC_CONFIG"
 
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+    if [ "$PROVISION_OK" = true ]; then
+      # Use server-provided config
+      python3 -c "
 import json
 with open('$OC_CONFIG', 'r') as f: data = json.load(f)
-provider = json.loads('''$PROVIDER_JSON''')
+provision = json.loads('''$PROVISION_JSON''')
+provider_cfg = provision.get('provider', {})
+provider_cfg['apiKey'] = '$API_KEY'
+provider_cfg['baseUrl'] = '$BASE_URL'
+if 'models' not in data: data['models'] = {}
+if 'providers' not in data['models']: data['models']['providers'] = {}
+data['models']['providers']['izzi'] = provider_cfg
+if 'agents' in data and 'defaults' in data['agents']:
+    if 'model' not in data['agents']['defaults']:
+        data['agents']['defaults']['model'] = {}
+    data['agents']['defaults']['model']['primary'] = 'izzi/auto'
+with open('$OC_CONFIG', 'w') as f:
+    json.dump(data, f, indent=2); f.write('\n')
+print('    ✓ Added izzi provider + set default to izzi/auto')
+" 2>/dev/null || warn "python3 failed — trying jq..."
+    else
+      # Fallback: minimal auto-only config
+      python3 -c "
+import json
+with open('$OC_CONFIG', 'r') as f: data = json.load(f)
+provider = {'baseUrl':'$BASE_URL','api':'openai-completions','apiKey':'$API_KEY','models':[{'id':'auto','name':'Smart Router (Auto)'}]}
 if 'models' not in data: data['models'] = {}
 if 'providers' not in data['models']: data['models']['providers'] = {}
 data['models']['providers']['izzi'] = provider
@@ -302,26 +336,29 @@ if 'agents' in data and 'defaults' in data['agents']:
     data['agents']['defaults']['model']['primary'] = 'izzi/auto'
 with open('$OC_CONFIG', 'w') as f:
     json.dump(data, f, indent=2); f.write('\n')
-print('    ✓ Added izzi provider + set default to izzi/auto')
-" 2>/dev/null || warn "python3 failed — trying jq..."
+print('    ✓ Added izzi provider (fallback mode)')
+" 2>/dev/null || warn "python3 failed"
+    fi
   fi
 
-  # jq fallback (always available, installed in step 1)
+  # jq fallback
   if ! grep -q '"izzi"' "$OC_CONFIG" 2>/dev/null && command -v jq >/dev/null 2>&1; then
     TMP_CONFIG=$(mktemp)
-    jq --argjson provider "$PROVIDER_JSON" \
+    FALLBACK_PROVIDER="{\"baseUrl\":\"$BASE_URL\",\"api\":\"openai-completions\",\"apiKey\":\"$API_KEY\",\"models\":[{\"id\":\"auto\",\"name\":\"Smart Router (Auto)\"}]}"
+    jq --argjson provider "$FALLBACK_PROVIDER" \
       '.models.providers.izzi = $provider | .agents.defaults.model.primary = "izzi/auto"' \
       "$OC_CONFIG" > "$TMP_CONFIG" 2>/dev/null && mv "$TMP_CONFIG" "$OC_CONFIG"
-    ok "Added izzi provider via jq"
+    ok "Added izzi provider via jq (fallback)"
   fi
 else
   warn "openclaw.json not found — creating..."
   mkdir -p "$OC_DIR"
+  FALLBACK_PROVIDER="{\"baseUrl\":\"$BASE_URL\",\"api\":\"openai-completions\",\"apiKey\":\"$API_KEY\",\"models\":[{\"id\":\"auto\",\"name\":\"Smart Router (Auto)\"}]}"
   cat > "$OC_CONFIG" << NEWCONF
 {
   "models": {
     "providers": {
-      "izzi": $PROVIDER_JSON
+      "izzi": $FALLBACK_PROVIDER
     }
   },
   "agents": {
@@ -344,22 +381,26 @@ if [ -d "$OC_DIR/agents" ]; then
   find "$OC_DIR/agents" -name "models.json" -path "*/agent/*" 2>/dev/null | while read -r f; do
     backup_file "$f"
     if command -v python3 >/dev/null 2>&1; then
-      python3 -c "
+      if [ "$PROVISION_OK" = true ]; then
+        python3 -c "
 import json
 with open('$f', 'r') as fh: data = json.load(fh)
-models_list = [
-    {'id':'auto','name':'Smart Router v4.2 (Auto)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5 Mini (Budget)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 Mini (Budget)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 (Standard)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.1 Codex (Code)','reasoning':False,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.2 (Premium)','reasoning':True,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'},
-    {'id':'REDACTED_MODEL','name':'GPT-5.4 (Premium)','reasoning':True,'input':['text'],'cost':{REDACTED_COST,REDACTED_COST,REDACTED_COST,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
-]
-data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':models_list}
+provision = json.loads('''$PROVISION_JSON''')
+agent_models = provision.get('agent_models', [])
+data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':agent_models}
 with open('$f', 'w') as fh:
     json.dump(data, fh, indent=2); fh.write('\n')
 " 2>/dev/null && ok "$(basename $(dirname $(dirname "$f")))/agent/models.json"
+      else
+        python3 -c "
+import json
+with open('$f', 'r') as fh: data = json.load(fh)
+auto_model = {'id':'auto','name':'Smart Router (Auto)','reasoning':False,'input':['text'],'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0},'contextWindow':200000,'maxTokens':8192,'api':'openai-completions'}
+data.setdefault('providers', {})['izzi'] = {'baseUrl':'$BASE_URL','apiKey':'$API_KEY','api':'openai-completions','models':[auto_model]}
+with open('$f', 'w') as fh:
+    json.dump(data, fh, indent=2); fh.write('\n')
+" 2>/dev/null && ok "$(basename $(dirname $(dirname "$f")))/agent/models.json (fallback)"
+      fi
     fi
   done
 fi
@@ -492,11 +533,8 @@ echo "  │ Quick Test:                                 │"
 echo "  │                                             │"
 echo "  │  curl -s http://localhost:$GATEWAY_PORT/health     │"
 echo "  │                                             │"
-echo "  │ Dashboard: $BASE_URL/dashboard        │"
-echo "  │ Docs:      $BASE_URL/docs             │"
+echo "  │ Dashboard: https://izziapi.com/dashboard    │"
+echo "  │ Docs:      https://izziapi.com/docs         │"
 echo "  │ Issues:    github.com/kentzu213/izzi-openclaw│"
 echo "  └─────────────────────────────────────────────┘"
-echo ""
-echo "  Models available: auto, REDACTED_MODEL, REDACTED_MODEL,"
-echo "  REDACTED_MODEL, REDACTED_MODEL, REDACTED_MODEL, REDACTED_MODEL"
 echo ""
