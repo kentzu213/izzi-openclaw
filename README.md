@@ -47,30 +47,40 @@ curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/instal
 ### 3. Restart OpenClaw
 Close and reopen OpenClaw. Select `auto · izzi` as your model, and start chatting!
 
-## 📊 Available Models (E2E Verified v4.2)
+## 📊 Available Models
 
-All models are verified working on production. Use `auto` for best value.
-
-### 💰 Budget
-| Model ID | Name | Input / Output |
-|----------|------|----------------|
-| `auto` | Smart Router v4.2 | ⭐ Auto-selects best model |
-| `REDACTED_MODEL` | GPT-5 Mini | $0.35 / $2.80 |
-| `REDACTED_MODEL` | GPT-5.1 Mini | $0.44 / $3.50 |
-
-### ⚡ Standard
-| Model ID | Name | Input / Output |
-|----------|------|----------------|
-| `REDACTED_MODEL` | GPT-5.1 | $0.70 / $5.60 |
-| `REDACTED_MODEL` | GPT-5.1 Codex | $0.70 / $5.60 |
-
-### 💎 Premium
-| Model ID | Name | Input / Output |
-|----------|------|----------------|
-| `REDACTED_MODEL` | GPT-5.2 | $1.23 / $9.80 |
-| `REDACTED_MODEL` | GPT-5.4 | $1.75 / $10.50 |
+Models are fetched securely from the server at install time. Use `auto` for best value.
 
 > 💡 **Tip**: Use `izzi/auto` for best quality-per-dollar — the Smart Router picks the optimal model automatically.
+>
+> Run the installer with your API key to see all available models and pricing for your plan.
+
+## 🔧 Binary Installer (Recommended)
+
+Pre-compiled binaries are available for all platforms — no source code exposure:
+
+```bash
+# Download from GitHub releases
+# https://github.com/kentzu213/izzi-openclaw/releases/latest
+
+# Then run:
+./izzi install izzi-YOUR_API_KEY      # Linux/macOS
+izzi.exe install izzi-YOUR_API_KEY    # Windows
+```
+
+| Platform | Binary |
+|----------|--------|
+| Windows x64 | `izzi-installer-windows-amd64.exe` |
+| macOS x64 | `izzi-installer-darwin-amd64` |
+| macOS ARM (M1/M2) | `izzi-installer-darwin-arm64` |
+| Linux x64 | `izzi-installer-linux-amd64` |
+| Linux ARM64 | `izzi-installer-linux-arm64` |
+
+### Verify Integrity
+```bash
+./izzi verify                           # Binary self-check
+sha256sum -c SHA256SUMS.txt            # Manual checksum verify
+```
 
 ## 🛠️ What the installer does
 
@@ -193,17 +203,23 @@ izzi-openclaw/
 ├── install.ps1          # Windows PowerShell installer
 ├── install.sh           # macOS/Linux desktop installer
 ├── install-vps.sh       # 🖥️ VPS/Server full installer (Ubuntu/Debian)
+├── cli/                 # 🔧 Go binary installer (v3.1.0+)
+│   ├── cmd/izzi/        #    Entry point
+│   └── internal/        #    Installer + security packages
 ├── startup.bat          # ⭐ Auto-start manager (Windows)
 ├── startup.ps1          # Task Scheduler automation
 ├── fix.bat              # Windows CMD auto-fix tool
 ├── fix.ps1              # Windows PowerShell auto-fix tool
 ├── fix.sh               # macOS/Linux auto-fix tool
 ├── templates/
-│   ├── openclaw-provider.json  # Provider config
-│   └── models.json             # Full agent model definitions (v4.2)
+│   └── README.md        # Server-config notice (no model data)
+├── .github/workflows/   # 🔒 Auto release + binary builds
+├── .goreleaser.yml      # Cross-platform build config
+├── SECURITY.md          # 🔒 Vulnerability reporting
 ├── SECURITY-RULES.md    # 🔒 Security contract (6 rules)
-├── README.md
-├── TROUBLESHOOTING.md   # Known issues & fixes (13 bugs documented)
+├── CONTRIBUTING.md      # 📋 CLA + contribution guidelines
+├── TRADEMARK.md         # ™ Trademark notice
+├── TROUBLESHOOTING.md   # Known issues & fixes
 ├── CHANGELOG.md
 ├── .gitattributes       # Line ending enforcement
 └── LICENSE              # BSL-1.1
@@ -211,14 +227,21 @@ izzi-openclaw/
 
 ## 🔐 Security
 
-**See [SECURITY-RULES.md](SECURITY-RULES.md) for the full security contract.**
-
 - ✅ API key verified with server BEFORE any config write
 - ✅ Invalid/expired/revoked keys are rejected immediately
 - ✅ No API keys stored in this repo — keys only in local config
-- ✅ Backups created before config modification (`.bak` files)
-- ✅ Strict format enforcement: `izzi-` prefix + 48+ chars
+- ✅ Installer self-verification (SHA256 checksums)
+- ✅ Device fingerprinting for abuse detection
+- ✅ Version outdated warnings
+- ✅ Compiled binary option to prevent source code exposure
 - ❌ No `-Force` bypass for key validation
+
+| Document | Purpose |
+|----------|--------|
+| [SECURITY.md](SECURITY.md) | 🔒 Vulnerability reporting & response process |
+| [SECURITY-RULES.md](SECURITY-RULES.md) | 🔒 Security contract (6 binding rules) |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 📋 CLA + contribution guidelines |
+| [TRADEMARK.md](TRADEMARK.md) | ™ Trademark usage guidelines |
 
 ## 📄 License
 This project is licensed under the [Business Source License 1.1](LICENSE).
