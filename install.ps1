@@ -272,6 +272,16 @@ Write-Host ""
 # They are fetched securely from the Izzi API at install time.
 # ==============================
 
+# Generate device fingerprint for security tracking
+$deviceId = ""
+try {
+    $hostBytes = [System.Text.Encoding]::UTF8.GetBytes($env:COMPUTERNAME)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $deviceId = [BitConverter]::ToString($sha.ComputeHash($hostBytes)).Replace("-","").ToLower().Substring(0,16)
+} catch {
+    $deviceId = "unknown"
+}
+
 Write-Host "  Fetching configuration from server..." -ForegroundColor White
 $provisionData = $null
 try {
@@ -282,6 +292,7 @@ try {
         "User-Agent" = "izzi-installer/$Version (PowerShell)"
         "X-Installer-Version" = $Version
         "X-Platform" = "windows"
+        "X-Device-ID" = $deviceId
     }
     $provisionBody = @{
         installer_version = $Version
@@ -289,6 +300,13 @@ try {
     } | ConvertTo-Json
     $provisionData = Invoke-RestMethod -Uri $provisionUrl -Method Post -Headers $provisionHeaders -Body $provisionBody -TimeoutSec 20 -ErrorAction Stop
     Write-Ok "Configuration received ($($provisionData.agent_models.Count) models)"
+
+    # Handle server warnings (Phase 2: abuse detection feedback)
+    if ($provisionData.warnings -and $provisionData.warnings.Count -gt 0) {
+        foreach ($w in $provisionData.warnings) {
+            Write-Warn $w
+        }
+    }
 }
 catch {
     $statusCode = $_.Exception.Response.StatusCode.value__

@@ -272,6 +272,13 @@ ok "OpenClaw directory: $OC_DIR"
 # Model definitions and pricing are NOT stored in this script.
 # They are fetched securely from the Izzi API at install time.
 # ═════════════════════════════════════════════════════════
+# Generate device fingerprint for security tracking
+DEVICE_ID="unknown"
+if command -v sha256sum >/dev/null 2>&1; then
+  DEVICE_ID=$(echo -n "$(hostname)" | sha256sum | cut -c1-16)
+elif command -v shasum >/dev/null 2>&1; then
+  DEVICE_ID=$(echo -n "$(hostname)" | shasum -a 256 | cut -c1-16)
+fi
 
 echo "  Fetching configuration from server..."
 PROVISION_JSON=""
@@ -281,6 +288,7 @@ PROVISION_JSON=$(curl -s -X POST \
   -H "User-Agent: izzi-installer/$VERSION (bash-vps)" \
   -H "X-Installer-Version: $VERSION" \
   -H "X-Platform: $(uname -s | tr '[:upper:]' '[:lower:]')-vps" \
+  -H "X-Device-ID: $DEVICE_ID" \
   -d "{\"installer_version\":\"$VERSION\",\"platform\":\"$(uname -s | tr '[:upper:]' '[:lower:]')-vps\"}" \
   "$BASE_URL/v1/provision" 2>/dev/null || echo "")
 
@@ -290,6 +298,15 @@ if [ -n "$PROVISION_JSON" ] && echo "$PROVISION_JSON" | grep -q '"provider"' 2>/
   MODEL_COUNT=$(echo "$PROVISION_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('agent_models',[])))" 2>/dev/null || echo "0")
   ok "Configuration received ($MODEL_COUNT models)"
   PROVISION_OK=true
+
+  # Handle server warnings (Phase 2: abuse detection feedback)
+  WARNINGS=$(echo "$PROVISION_JSON" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for w in d.get('warnings',[]):
+    print('    ⚠ ' + w)
+" 2>/dev/null || true)
+  [ -n "$WARNINGS" ] && echo "$WARNINGS"
 else
   warn "Could not fetch config from server. Using fallback mode..."
 fi
