@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate checksums
+        run: |
+          echo "=== Generating SHA256 checksums ==="
+          sha256sum install.ps1 install.sh install-vps.sh install.bat \
+            fix.ps1 fix.sh fix.bat \
+            startup.ps1 startup.bat \
+            > SHA256SUMS.txt
+          echo ""
+          echo "=== SHA256SUMS.txt ==="
+          cat SHA256SUMS.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            install.ps1
+            install.sh
+            install-vps.sh
+            install.bat
+            fix.ps1
+            fix.sh
+            fix.bat
+            startup.ps1
+            startup.bat
+            SHA256SUMS.txt
+          generate_release_notes: true
+          body: |
+            ## 🔒 Integrity Verification
+
+            Every installer includes a SHA256 checksum for integrity verification.
+            Download `SHA256SUMS.txt` and verify:
+
+            **Linux/macOS:**
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
+
+            **Windows (PowerShell):**
+            ```powershell
+            Get-Content SHA256SUMS.txt | ForEach-Object {
+              $parts = $_ -split '\s+'
+              $expected = $parts[0]
+              $file = $parts[1]
+              $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+              if ($actual -eq $expected) { Write-Host "OK: $file" }
+              else { Write-Host "MISMATCH: $file" -ForegroundColor Red }
+            }
+            ```
+
+            ## 📦 Installation
+
+            ```bash
+            # One-line install (Linux/macOS)
+            curl -fsSL https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install.sh | bash -s -- "izzi-YOUR_KEY"
+
+            # PowerShell (Windows)
+            irm https://raw.githubusercontent.com/kentzu213/izzi-openclaw/main/install.ps1 | iex
+            ```

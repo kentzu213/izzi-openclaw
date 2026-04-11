@@ -317,6 +317,41 @@ catch {
     }
 }
 
+# ═══════════════════════════════════════════════════════
+# INTEGRITY CHECK: Verify this installer hasn't been tampered
+# Phase 3 Security: SHA256 self-verification against server checksums
+# ═══════════════════════════════════════════════════════
+
+if ($provisionData -and $provisionData.checksums) {
+    try {
+        $selfHash = (Get-FileHash $PSCommandPath -Algorithm SHA256).Hash.ToLower()
+        $serverHash = $provisionData.checksums.'install.ps1'
+        if ($serverHash) {
+            if ($selfHash -eq $serverHash) {
+                Write-Ok "Installer integrity verified (SHA256 match)"
+            } else {
+                Write-Warn "Installer checksum mismatch! This file may have been modified."
+                Write-Host "    Expected: $serverHash" -ForegroundColor Yellow
+                Write-Host "    Actual:   $selfHash" -ForegroundColor Yellow
+                Write-Host "    Download official: https://github.com/kentzu213/izzi-openclaw/releases/latest" -ForegroundColor Yellow
+                Write-Host ""
+            }
+        }
+    } catch {
+        # Can't verify (e.g., piped from irm) — skip silently
+    }
+}
+
+# Version check: warn if installer is outdated
+if ($provisionData -and $provisionData.installer_latest) {
+    $latestVersion = $provisionData.installer_latest
+    if ($Version -ne $latestVersion) {
+        Write-Warn "Installer v$Version is outdated. Latest: v$latestVersion"
+        Write-Host "    Download latest: https://github.com/kentzu213/izzi-openclaw/releases/latest" -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
+
 $step = 1
 $total = 5
 

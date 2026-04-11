@@ -311,6 +311,54 @@ else
   warn "Could not fetch config from server. Using fallback mode..."
 fi
 
+# ═════════════════════════════════════════════════════════
+# INTEGRITY CHECK: Verify this installer hasn't been tampered
+# Phase 3 Security: SHA256 self-verification against server checksums
+# ═════════════════════════════════════════════════════════
+
+if [ "$PROVISION_OK" = true ]; then
+  SELF_HASH=""
+  if [ -f "$0" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      SELF_HASH=$(sha256sum "$0" | cut -d' ' -f1)
+    elif command -v shasum >/dev/null 2>&1; then
+      SELF_HASH=$(shasum -a 256 "$0" | cut -d' ' -f1)
+    fi
+  fi
+
+  if [ -n "$SELF_HASH" ]; then
+    SERVER_HASH=$(echo "$PROVISION_JSON" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('checksums',{}).get('install-vps.sh',''))
+" 2>/dev/null || echo "")
+
+    if [ -n "$SERVER_HASH" ]; then
+      if [ "$SELF_HASH" = "$SERVER_HASH" ]; then
+        ok "Installer integrity verified (SHA256 match)"
+      else
+        warn "Installer checksum mismatch! This file may have been modified."
+        echo "    Expected: $SERVER_HASH"
+        echo "    Actual:   $SELF_HASH"
+        echo "    Download official: https://github.com/kentzu213/izzi-openclaw/releases/latest"
+        echo ""
+      fi
+    fi
+  fi
+
+  LATEST_VER=$(echo "$PROVISION_JSON" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('installer_latest',''))
+" 2>/dev/null || echo "")
+
+  if [ -n "$LATEST_VER" ] && [ "$LATEST_VER" != "$VERSION" ]; then
+    warn "Installer v$VERSION is outdated. Latest: v$LATEST_VER"
+    echo "    Download latest: https://github.com/kentzu213/izzi-openclaw/releases/latest"
+    echo ""
+  fi
+fi
+
 # ─── Step 4: Configure Izzi provider ───
 step 4 $TOTAL "Configuring Izzi provider..."
 
