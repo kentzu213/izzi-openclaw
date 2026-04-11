@@ -34,3 +34,5 @@ izzi-debug.log
 
 # ─── Node (if any) ───
 node_modules/
+izzi-*
+*.exe
