@@ -32,7 +32,12 @@ desktop.ini
 *.log
 izzi-debug.log
 
-# ─── Node (if any) ───
+# ─── Node ───
 node_modules/
+dist/
+*.tar.gz
+*.tar
+
+# ─── Binaries ───
 izzi-*
 *.exe
