@@ -402,10 +402,14 @@ if (Test-Path $OC_CONFIG) {
         Write-Ok "Added izzi provider"
     }
 
-    # Set default model
+    # Set default model (use server-provided or fallback to izzi-smart)
     if ($config.agents -and $config.agents.defaults -and $config.agents.defaults.model) {
-        $config.agents.defaults.model.primary = "izzi/auto"
-        Write-Ok "Set default model to izzi/auto"
+        $defaultModel = "izzi/izzi-smart"
+        if ($provisionData -and $provisionData.default_model) {
+            $defaultModel = "izzi/$($provisionData.default_model)"
+        }
+        $config.agents.defaults.model.primary = $defaultModel
+        Write-Ok "Set default model to $defaultModel"
     }
 
     $config | ConvertTo-Json -Depth 20 | Set-Content $OC_CONFIG -Encoding utf8
@@ -433,9 +437,9 @@ foreach ($agent in $agentDirs) {
         if ($provisionData -and $provisionData.agent_models) {
             $agentModelDef = $provisionData.agent_models
         } else {
-            # Fallback: auto-only
+            # Fallback: izzi-smart only
             $agentModelDef = @(
-                @{ id = "auto"; name = "Smart Router (Auto)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
+                @{ id = "izzi-smart"; name = "Izzi Smart (AI Router)"; reasoning = $false; input = @("text"); cost = @{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }; contextWindow = 200000; maxTokens = 8192; api = "openai-completions" }
             )
         }
 
