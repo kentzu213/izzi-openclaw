@@ -235,19 +235,25 @@ try {
     
     if ($keyInfo.role -eq "admin") {
         Write-Host ""
-        Write-Err "SECURITY BLOCKED: This is an ADMIN API key!"
+        Write-Warn "This is an ADMIN API key."
         Write-Host ""
-        Write-Host "    Admin keys must NOT be used in customer installations." -ForegroundColor Red
-        Write-Host "    Using admin keys on external machines creates security risks." -ForegroundColor Red
+        Write-Host "    Admin keys have full system access." -ForegroundColor Yellow
+        Write-Host "    Only use admin keys on machines you own/control." -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "    Instead, create a USER-level key:" -ForegroundColor Yellow
-        Write-Host "      1. Log in at https://izziapi.com/dashboard" -ForegroundColor Gray
-        Write-Host "      2. Go to 'API Keys' and create a new key" -ForegroundColor Gray
-        Write-Host "      3. Use that key with this installer" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "  Installation ABORTED. No config files were modified." -ForegroundColor Red
-        Write-Host ""
-        exit 1
+        
+        # Allow override via environment variable (for scripted installs)
+        if ($env:IZZI_ALLOW_ADMIN -eq "1") {
+            Write-Ok "Admin key allowed (IZZI_ALLOW_ADMIN=1)"
+        } else {
+            $confirm = Read-Host "    Continue with admin key? (y/N)"
+            if ($confirm -ne "y" -and $confirm -ne "Y") {
+                Write-Host ""
+                Write-Host "  Installation ABORTED. No config files were modified." -ForegroundColor Red
+                Write-Host ""
+                exit 1
+            }
+            Write-Ok "Admin key accepted by user confirmation"
+        }
     }
     
     # Show key owner info for confirmation
